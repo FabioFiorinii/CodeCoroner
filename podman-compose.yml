@@ -1,0 +1,239 @@
+version: "3.9"
+
+networks:
+  codecoroner_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  pg_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
+  ollama_models:
+    driver: local
+  repo_cache:
+    driver: local
+  static_volume:
+    driver: local
+
+services:
+  postgres:
+    image: docker.io/pgvector/pgvector:pg16
+    container_name: codecoroner-postgres
+    volumes:
+      - pg_data:/var/lib/postgresql/data:Z
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro,Z
+    environment:
+      POSTGRES_DB: ${DB_NAME:-codecoroner}
+      POSTGRES_USER: ${DB_USER:-codecoroner}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-dev_password}
+    networks:
+      - codecoroner_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-codecoroner}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: docker.io/redis:7-alpine
+    container_name: codecoroner-redis
+    volumes:
+      - redis_data:/data:Z
+    networks:
+      - codecoroner_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "6379:6379"
+
+  minio:
+    image: docker.io/minio/minio:latest
+    container_name: codecoroner-minio
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data:Z
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER:-codecoroner}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-minio_dev_password}
+    networks:
+      - codecoroner_net
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
+  ollama:
+    image: docker.io/ollama/ollama:latest
+    container_name: codecoroner-ollama
+    volumes:
+      - ollama_models:/root/.ollama:Z
+    environment:
+      OLLAMA_HOST: 0.0.0.0
+    networks:
+      - codecoroner_net
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+
+  django:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: codecoroner-django
+    command: >
+      sh -c "python manage.py makemigrations &&
+             python manage.py migrate &&
+             python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - ./backend:/app:Z
+      - static_volume:/app/static:Z
+      - repo_cache:/app/media/repos:Z
+    env_file:
+      - .env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.dev
+      DB_HOST: postgres
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      OLLAMA_BASE_URL: http://ollama:11434
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - codecoroner_net
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+
+  daphne:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: codecoroner-daphne
+    command: daphne -b 0.0.0.0 -p 8001 config.asgi:application
+    volumes:
+      - ./backend:/app:Z
+      - repo_cache:/app/media/repos:Z
+    env_file:
+      - .env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.dev
+      DB_HOST: postgres
+      REDIS_URL: redis://redis:6379/0
+      OLLAMA_BASE_URL: http://ollama:11434
+    depends_on:
+      - django
+      - redis
+    networks:
+      - codecoroner_net
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: codecoroner-celery
+    command: celery -A config.celery worker -l INFO --concurrency=2
+    volumes:
+      - ./backend:/app:Z
+      - repo_cache:/app/media/repos:Z
+    env_file:
+      - .env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.dev
+      DB_HOST: postgres
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      OLLAMA_BASE_URL: http://ollama:11434
+    depends_on:
+      - django
+      - redis
+    networks:
+      - codecoroner_net
+    restart: unless-stopped
+
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: codecoroner-beat
+    command: celery -A config.celery beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    volumes:
+      - ./backend:/app:Z
+    env_file:
+      - .env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.dev
+      DB_HOST: postgres
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+    depends_on:
+      - django
+      - redis
+    networks:
+      - codecoroner_net
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: codecoroner-frontend
+    volumes:
+      - ./frontend:/app:Z
+      - /app/node_modules
+    networks:
+      - codecoroner_net
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+
+  ai-engine:
+    build:
+      context: ./ai-engine
+      dockerfile: Dockerfile
+    container_name: codecoroner-ai-engine
+    volumes:
+      - ./ai-engine:/app:Z
+      - repo_cache:/app/repos:ro,Z
+    env_file:
+      - .env
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+    depends_on:
+      - ollama
+    networks:
+      - codecoroner_net
+    restart: unless-stopped
+
+  nginx:
+    image: docker.io/nginx:alpine
+    container_name: codecoroner-nginx
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro,Z
+      - static_volume:/static:ro,Z
+    depends_on:
+      - django
+      - frontend
+    networks:
+      - codecoroner_net
+    restart: unless-stopped
+    ports:
+      - "8080:80"

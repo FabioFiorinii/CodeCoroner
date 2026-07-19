@@ -1,0 +1,38 @@
+[project]
+name = "codecoroner-backend"
+version = "0.1.0"
+description = "CodeCoroner backend - AI-assisted debugging platform"
+requires-python = ">=3.13"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-django", "pytest-cov", "ruff", "mypy"]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "N", "UP", "B", "SIM", "ARG"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"*/settings/*.py" = ["E501"]
+
+[tool.ruff.format]
+quote-style = "single"
+
+[tool.mypy]
+python_version = "3.13"
+ignore_missing_imports = true
+strict = false
+django_settings_module = "config.settings.dev"
+plugins = ["mypy_django_plugin.plugin"]
+
+[tool.mypy.plugins.django-stubs]
+django_settings_module = "config.settings.dev"
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+python_files = ["tests.py", "test_*.py", "*_tests.py"]
+testpaths = ["."]
