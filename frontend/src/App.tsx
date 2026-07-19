@@ -2,6 +2,9 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/layout/Layout'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
+import { ProjectListPage } from './pages/ProjectListPage'
+import { ProjectNewPage } from './pages/ProjectNewPage'
+import { ProjectDetailPage } from './pages/ProjectDetailPage'
 import { ProtectedRoute } from './components/common/ProtectedRoute'
 
 function App() {
@@ -20,9 +23,9 @@ function App() {
         >
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<div>Dashboard</div>} />
-          <Route path="projects" element={<div>Projects</div>} />
-          <Route path="projects/new" element={<div>New Project</div>} />
-          <Route path="projects/:id" element={<div>Project Detail</div>} />
+          <Route path="projects" element={<ProjectListPage />} />
+          <Route path="projects/new" element={<ProjectNewPage />} />
+          <Route path="projects/:id" element={<ProjectDetailPage />} />
           <Route path="analyses" element={<div>Analyses</div>} />
           <Route path="analyses/:id" element={<div>Analysis Detail</div>} />
         </Route>

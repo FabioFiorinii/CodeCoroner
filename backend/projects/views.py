@@ -21,10 +21,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         return Project.objects.filter(
             Q(created_by=self.request.user) |
             Q(memberships__user=self.request.user)
-        ).distinct().prefetch_related('memberships__user')
-
-    def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        ).distinct().prefetch_related('memberships__user').order_by('-created_at')
 
     @action(detail=True, methods=['get', 'post'])
     def members(self, request, pk=None):
