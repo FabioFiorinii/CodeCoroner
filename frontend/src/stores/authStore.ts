@@ -29,7 +29,7 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       user: null,
       isAuthenticated: false,
       isLoading: false,
@@ -56,13 +56,12 @@ export const useAuthStore = create<AuthState>()(
       register: async (email, username, password) => {
         set({ isLoading: true, error: null })
         try {
-          const user = await api.post<User>('/auth/register/', {
+          await api.post<User>('/auth/register/', {
             email,
             username,
             password,
           })
           set({ isLoading: false })
-          return user
         } catch (err: unknown) {
           const message =
             err instanceof Error ? err.message : 'Registration failed'
