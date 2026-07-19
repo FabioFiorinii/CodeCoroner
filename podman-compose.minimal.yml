@@ -1,0 +1,54 @@
+# Fase 0: Minimal stack — solo backend + database
+# Usa Django runserver nudo, senza celery/ai-engine/frontend
+
+version: "3.9"
+
+networks:
+  codecoroner_net:
+    driver: bridge
+
+volumes:
+  pg_data:
+    driver: local
+
+services:
+  postgres:
+    image: docker.io/pgvector/pgvector:pg16
+    container_name: cc-postgres
+    volumes:
+      - pg_data:/var/lib/postgresql/data:Z
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro,Z
+    environment:
+      POSTGRES_DB: codecoroner
+      POSTGRES_USER: codecoroner
+      POSTGRES_PASSWORD: dev_password
+    networks:
+      - codecoroner_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U codecoroner"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  redis:
+    image: docker.io/redis:7-alpine
+    container_name: cc-redis
+    volumes:
+      - redis_data:/data:Z
+    networks:
+      - codecoroner_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+    driver: local
