@@ -1,27 +1,5 @@
 const BASE = '/api/v1'
 
-async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const token = localStorage.getItem('access_token')
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...options?.headers,
-  }
-
-  const res = await fetch(`${BASE}${url}`, { ...options, headers })
-
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    throw new ApiError(
-      body.detail || body.message || 'Request failed',
-      res.status,
-      body,
-    )
-  }
-
-  return res.json()
-}
-
 export class ApiError extends Error {
   status: number
   body: unknown
@@ -32,6 +10,38 @@ export class ApiError extends Error {
     this.status = status
     this.body = body
   }
+}
+
+function extractMessage(body: Record<string, unknown>): string {
+  const errors = body.errors as Array<{ detail: string }> | undefined
+  if (errors && errors.length > 0) {
+    return errors.map((e) => e.detail).join('; ')
+  }
+  return (body.detail as string) || (body.message as string) || 'Request failed'
+}
+
+async function request<T>(url: string, options?: RequestInit): Promise<T> {
+  const token = localStorage.getItem('access_token')
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  }
+
+  if (options?.body instanceof FormData) {
+    delete headers['Content-Type']
+  }
+
+  const res = await fetch(`${BASE}${url}`, {
+    ...options,
+    headers: { ...headers, ...(options?.headers as Record<string, string>) },
+  })
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new ApiError(extractMessage(body), res.status, body)
+  }
+
+  return res.json()
 }
 
 export const api = {

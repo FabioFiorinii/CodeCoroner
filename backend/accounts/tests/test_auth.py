@@ -1,5 +1,4 @@
 from django.test import TestCase
-from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 from accounts.models import User
@@ -90,5 +89,7 @@ class AuthTests(TestCase):
     def test_9_login_missing_fields(self):
         response = self.client.post(self.login_url, {}, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('email', response.data)
-        self.assertIn('password', response.data)
+        self.assertIn('errors', response.data)
+        fields = {err['field'] for err in response.data['errors']}
+        self.assertIn('email', fields)
+        self.assertIn('password', fields)
