@@ -225,6 +225,8 @@ services:
     networks:
       - codecoroner_net
     restart: unless-stopped
+    ports:
+      - "8002:8002"
 
   nginx:
     image: docker.io/nginx:alpine

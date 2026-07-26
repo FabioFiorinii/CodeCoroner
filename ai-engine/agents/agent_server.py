@@ -1,33 +1,62 @@
-import asyncio
-import json
 import logging
-from httpx import ASGITransport
-from core.ollama_client import OllamaClient
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+
 from core.config import AgentSettings
+from core.ollama_client import OllamaClient
+from agents.repository_indexer.indexer import RepositoryIndexer
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class AgentServer:
-    def __init__(self):
-        self.settings = AgentSettings()
-        self.ollama = OllamaClient(self.settings.ollama_base_url)
+settings = AgentSettings()
+ollama = OllamaClient(settings.ollama_base_url)
+indexer = RepositoryIndexer()
 
-    async def health_check(self):
-        healthy = await self.ollama.health()
-        return {'status': 'healthy' if healthy else 'unhealthy', 'ollama': healthy}
 
-    async def run(self):
-        logger.info('Starting AgentServer...')
-        health = await self.health_check()
-        logger.info(f'Health: {health}')
-        while True:
-            await asyncio.sleep(60)
-            logger.debug('AgentServer heartbeat')
+class EmbedRequest(BaseModel):
+    texts: list[str]
+    model: str = 'nomic-embed-text'
 
-async def main():
-    server = AgentServer()
-    await server.run()
 
-if __name__ == '__main__':
-    asyncio.run(main())
+class IndexRequest(BaseModel):
+    repo_path: str
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info('AgentServer starting...')
+    health = await ollama.health()
+    logger.info('Ollama health: %s', health)
+    yield
+    await ollama.close()
+    logger.info('AgentServer stopped')
+
+
+app = FastAPI(title='CodeCoroner AI Engine', version='0.1.0', lifespan=lifespan)
+
+
+@app.get('/health')
+async def health():
+    healthy = await ollama.health()
+    return {'status': 'healthy' if healthy else 'unhealthy', 'ollama': healthy}
+
+
+@app.post('/embed')
+async def embed(req: EmbedRequest):
+    try:
+        embeddings = await ollama.embed(req.model, req.texts)
+        return {'embeddings': embeddings, 'model': req.model, 'count': len(req.texts)}
+    except Exception as exc:
+        logger.error('Embedding failed: %s', exc)
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+@app.post('/index')
+async def index(req: IndexRequest):
+    result = await indexer.run(req.repo_path)
+    if result.get('status') == 'error':
+        raise HTTPException(status_code=400, detail=result.get('error'))
+    return result

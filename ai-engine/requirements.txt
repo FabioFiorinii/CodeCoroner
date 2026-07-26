@@ -1,6 +1,8 @@
 httpx>=0.27
 pydantic>=2.7
 pydantic-settings>=2.2
+fastapi>=0.115
+uvicorn[standard]>=0.34
 tree-sitter>=0.22
 tree-sitter-python>=0.22
 tree-sitter-typescript>=0.22

@@ -16,13 +16,16 @@ class OllamaClient:
         return response.json()['response']
 
     async def embed(self, model: str, input_text: str | list[str]) -> list[float] | list[list[float]]:
-        response = await self.client.post('/api/embeddings', json={
-            'model': model,
-            'input': input_text if isinstance(input_text, list) else [input_text],
-        })
-        response.raise_for_status()
-        data = response.json()
-        embeddings = data.get('embeddings', [data.get('embedding', [])])
+        inputs = input_text if isinstance(input_text, list) else [input_text]
+        embeddings = []
+        for text in inputs:
+            response = await self.client.post('/api/embeddings', json={
+                'model': model,
+                'prompt': text,
+            })
+            response.raise_for_status()
+            data = response.json()
+            embeddings.append(data['embedding'])
         if isinstance(input_text, str):
             return embeddings[0]
         return embeddings

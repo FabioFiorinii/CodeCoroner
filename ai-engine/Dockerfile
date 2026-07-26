@@ -19,4 +19,6 @@ ENV PYTHONPATH=/app \
 
 USER agent
 
-CMD ["python", "-m", "agents.agent_server"]
+EXPOSE 8002
+
+CMD ["uvicorn", "agents.agent_server:app", "--host", "0.0.0.0", "--port", "8002"]
