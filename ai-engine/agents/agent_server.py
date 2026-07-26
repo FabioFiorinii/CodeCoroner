@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from core.config import AgentSettings
 from core.ollama_client import OllamaClient
 from agents.repository_indexer.indexer import RepositoryIndexer
+from agents.embedding_generator.generator import EmbeddingGenerator
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -14,6 +15,7 @@ logger = logging.getLogger(__name__)
 settings = AgentSettings()
 ollama = OllamaClient(settings.ollama_base_url)
 indexer = RepositoryIndexer()
+embedder = EmbeddingGenerator()
 
 
 class EmbedRequest(BaseModel):
@@ -32,6 +34,7 @@ async def lifespan(app: FastAPI):
     logger.info('Ollama health: %s', health)
     yield
     await ollama.close()
+    await embedder.close()
     logger.info('AgentServer stopped')
 
 
@@ -46,9 +49,20 @@ async def health():
 
 @app.post('/embed')
 async def embed(req: EmbedRequest):
+    chunks = [{'content': t} for t in req.texts]
+    embedder.settings.embed_model = req.model
     try:
-        embeddings = await ollama.embed(req.model, req.texts)
-        return {'embeddings': embeddings, 'model': req.model, 'count': len(req.texts)}
+        result = await embedder.run(chunks)
+        if result['status'] == 'error' or result['failed'] == len(req.texts):
+            raise HTTPException(status_code=502, detail='All embedding batches failed')
+        return {
+            'embeddings': result['embeddings'],
+            'model': req.model,
+            'count': result['count'],
+            'failed': result['failed'],
+        }
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error('Embedding failed: %s', exc)
         raise HTTPException(status_code=502, detail=str(exc))
