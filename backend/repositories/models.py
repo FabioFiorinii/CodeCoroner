@@ -22,6 +22,7 @@ class Repository(models.Model):
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     file_count = models.IntegerField(default=0)
     total_bytes = models.BigIntegerField(default=0)
+    error_message = models.TextField(blank=True, default='')
     last_indexed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

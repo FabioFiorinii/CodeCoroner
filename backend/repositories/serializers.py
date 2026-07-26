@@ -8,10 +8,10 @@ class RepositorySerializer(serializers.ModelSerializer):
         model = Repository
         fields = [
             'id', 'project', 'project_name', 'git_url', 'git_branch',
-            'status', 'file_count', 'total_bytes', 'last_indexed_at',
+            'status', 'file_count', 'total_bytes', 'error_message', 'last_indexed_at',
             'created_at', 'updated_at',
         ]
-        read_only_fields = ['id', 'status', 'file_count', 'total_bytes', 'last_indexed_at', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'status', 'file_count', 'total_bytes', 'error_message', 'last_indexed_at', 'created_at', 'updated_at']
 
 class IndexedFileSerializer(serializers.ModelSerializer):
     class Meta:

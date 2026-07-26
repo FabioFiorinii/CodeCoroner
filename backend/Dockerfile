@@ -3,7 +3,7 @@ FROM docker.io/python:3.13-slim
 WORKDIR /app
 
 COPY requirements.txt .
-RUN apt-get update && apt-get install -y --no-install-recommends gcc build-essential && \
+RUN apt-get update && apt-get install -y --no-install-recommends gcc build-essential git && \
     pip install --no-cache-dir -r requirements.txt && \
     apt-get purge -y gcc build-essential && \
     apt-get autoremove -y && \

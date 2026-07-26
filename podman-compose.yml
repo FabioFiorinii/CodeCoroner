@@ -108,6 +108,7 @@ services:
       DB_HOST: postgres
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/1
+      GIT_PYTHON_REFRESH: quiet
       OLLAMA_BASE_URL: http://ollama:11434
     depends_on:
       postgres:
@@ -135,6 +136,7 @@ services:
       DJANGO_SETTINGS_MODULE: config.settings.dev
       DB_HOST: postgres
       REDIS_URL: redis://redis:6379/0
+      GIT_PYTHON_REFRESH: quiet
       OLLAMA_BASE_URL: http://ollama:11434
     depends_on:
       - django
@@ -161,6 +163,7 @@ services:
       DB_HOST: postgres
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/1
+      GIT_PYTHON_REFRESH: quiet
       OLLAMA_BASE_URL: http://ollama:11434
     depends_on:
       - django

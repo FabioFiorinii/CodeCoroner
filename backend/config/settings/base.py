@@ -152,6 +152,8 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
+AI_ENGINE_URL = os.environ.get('AI_ENGINE_URL', 'http://ai-engine:8002')
+
 CORS_ALLOWED_ORIGINS = os.environ.get(
     'CORS_ALLOWED_ORIGINS',
     'http://localhost:8080,http://localhost:5173',
