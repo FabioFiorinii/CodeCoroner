@@ -2,7 +2,10 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import Repository, IndexedFile, CodeChunk
-from .serializers import RepositorySerializer, IndexedFileSerializer, CodeChunkSerializer
+from .serializers import (
+    RepositorySerializer, RepositoryCreateSerializer,
+    IndexedFileSerializer, CodeChunkSerializer,
+)
 
 
 class IsProjectMember(permissions.BasePermission):
@@ -11,13 +14,22 @@ class IsProjectMember(permissions.BasePermission):
 
 
 class RepositoryViewSet(viewsets.ModelViewSet):
-    serializer_class = RepositorySerializer
     permission_classes = [permissions.IsAuthenticated, IsProjectMember]
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return RepositoryCreateSerializer
+        return RepositorySerializer
 
     def get_queryset(self):
         return Repository.objects.filter(
             project__memberships__user=self.request.user
         ).select_related('project').distinct()
+
+    def perform_create(self, serializer):
+        repo = serializer.save()
+        from .tasks import clone_repository_task
+        clone_repository_task.delay(str(repo.id))
 
     @action(detail=True, methods=['post'])
     def index(self, request, pk=None):

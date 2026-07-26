@@ -1,5 +1,30 @@
+import re
 from rest_framework import serializers
 from .models import Repository, IndexedFile, CodeChunk, ChunkEmbedding
+
+
+GIT_URL_PATTERN = re.compile(
+    r'^(https?://|git@)[\w\.-]+(:[\d]+)?[/:][\w\.-]+/[\w\.-]+(\.git)?/?$'
+)
+
+
+class RepositoryCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Repository
+        fields = ['id', 'project', 'git_url', 'git_branch']
+        read_only_fields = ['id']
+
+    def validate_git_url(self, value):
+        if not GIT_URL_PATTERN.match(value):
+            raise serializers.ValidationError('Invalid git URL format.')
+        return value
+
+    def validate_project(self, value):
+        request = self.context.get('request')
+        if request and not value.memberships.filter(user=request.user).exists():
+            raise serializers.ValidationError('You are not a member of this project.')
+        return value
+
 
 class RepositorySerializer(serializers.ModelSerializer):
     project_name = serializers.CharField(source='project.name', read_only=True)

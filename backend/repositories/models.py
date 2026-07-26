@@ -29,6 +29,7 @@ class Repository(models.Model):
 
     class Meta:
         verbose_name_plural = 'repositories'
+        ordering = ['-created_at']
 
     def __str__(self):
         return f'{self.git_url} ({self.status})'
