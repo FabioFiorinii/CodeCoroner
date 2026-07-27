@@ -41,8 +41,12 @@ export function RepositoryDetailPage() {
 
   const handleDelete = async () => {
     if (!window.confirm('Delete this repository permanently? Indexed data will be lost.')) return
-    await deleteRepo.mutateAsync(repoId!)
-    navigate(`/projects/${projectId}/repos`, { replace: true })
+    try {
+      await deleteRepo.mutateAsync(repoId!)
+      navigate(`/projects/${projectId}/repos`, { replace: true })
+    } catch {
+      // error handled by mutation
+    }
   }
 
   if (isLoading) {
