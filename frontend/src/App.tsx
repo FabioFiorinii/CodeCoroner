@@ -9,6 +9,9 @@ import { RepositoryListPage } from './pages/RepositoryListPage'
 import { RepositoryNewPage } from './pages/RepositoryNewPage'
 import { RepositoryDetailPage } from './pages/RepositoryDetailPage'
 import { ProtectedRoute } from './components/common/ProtectedRoute'
+import { AnalysisListPage } from './pages/AnalysisListPage'
+import { AnalysisNewPage } from './pages/AnalysisNewPage'
+import { AnalysisDetailPage } from './pages/AnalysisDetailPage'
 
 function App() {
   return (
@@ -32,8 +35,11 @@ function App() {
           <Route path="projects/:projectId/repos" element={<RepositoryListPage />} />
           <Route path="projects/:projectId/repos/new" element={<RepositoryNewPage />} />
           <Route path="projects/:projectId/repos/:repoId" element={<RepositoryDetailPage />} />
-          <Route path="analyses" element={<div>Analyses</div>} />
-          <Route path="analyses/:id" element={<div>Analysis Detail</div>} />
+          <Route path="projects/:projectId/analyses" element={<AnalysisListPage />} />
+          <Route path="projects/:projectId/analyses/new" element={<AnalysisNewPage />} />
+          <Route path="projects/:projectId/analyses/:id" element={<AnalysisDetailPage />} />
+          <Route path="analyses" element={<AnalysisListPage />} />
+          <Route path="analyses/:id" element={<AnalysisDetailPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

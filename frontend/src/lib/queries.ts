@@ -189,3 +189,87 @@ export function useRepositoryChunks(id: string | undefined) {
     enabled: !!id,
   })
 }
+
+/* ───── Analyses ───── */
+
+const ANALYSES_KEY = 'analyses'
+
+export interface AnalysisItem {
+  id: string
+  user: string
+  project: string
+  repository: string
+  title: string
+  error_context: Record<string, unknown>
+  status: string
+  created_at: string
+  completed_at: string | null
+  duration_seconds: number | null
+  error_message: string
+  runs: Array<{
+    step: string
+    status: string
+    started_at: string
+    completed_at: string | null
+    error: string
+  }>
+  bug_localization: {
+    summary: string
+    suspicious_files: Array<{
+      file_path: string
+      suspicion_score: number
+      evidence: string
+      rank: number
+    }>
+    created_at: string
+  } | null
+  root_cause: {
+    summary: string
+    root_file: string
+    root_line: number | null
+    cause_chain: string
+    confidence: number
+    reasoning: string
+    created_at: string
+  } | null
+  report: {
+    markdown: string
+    format: string
+    created_at: string
+  } | null
+}
+
+export interface AnalysisInput {
+  project: string
+  repository: string
+  title: string
+  error_context: Record<string, unknown>
+}
+
+export function useAnalyses(projectId: string | undefined) {
+  return useQuery<{ results: AnalysisItem[] }>({
+    queryKey: [ANALYSES_KEY, { project: projectId }],
+    queryFn: () => api.get('/analyses/'),
+    enabled: !!projectId,
+  })
+}
+
+export function useAnalysis(id: string | undefined) {
+  return useQuery<AnalysisItem>({
+    queryKey: [ANALYSES_KEY, id],
+    queryFn: () => api.get(`/analyses/${id}/`),
+    enabled: !!id,
+    refetchInterval: (query) =>
+      ['queued', 'indexing', 'analyzing', 'bug_localization', 'rca', 'patching'].includes(query.state.data?.status ?? '')
+        ? 3000
+        : false,
+  })
+}
+
+export function useCreateAnalysis() {
+  const qc = useQueryClient()
+  return useMutation<AnalysisItem, Error, AnalysisInput>({
+    mutationFn: (data) => api.post<AnalysisItem>('/analyses/', data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [ANALYSES_KEY] }),
+  })
+}
