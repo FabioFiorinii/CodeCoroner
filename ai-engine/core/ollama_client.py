@@ -1,5 +1,8 @@
+import logging
 import httpx
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 class OllamaClient:
     def __init__(self, base_url: str = 'http://ollama:11434'):
@@ -19,13 +22,17 @@ class OllamaClient:
         inputs = input_text if isinstance(input_text, list) else [input_text]
         embeddings = []
         for text in inputs:
-            response = await self.client.post('/api/embeddings', json={
-                'model': model,
-                'prompt': text,
-            })
-            response.raise_for_status()
-            data = response.json()
-            embeddings.append(data['embedding'])
+            try:
+                response = await self.client.post('/api/embeddings', json={
+                    'model': model,
+                    'prompt': text,
+                })
+                response.raise_for_status()
+                data = response.json()
+                embeddings.append(data['embedding'])
+            except Exception:
+                logger.warning('Embedding failed for text (len=%d), returning zero vector', len(text))
+                embeddings.append([0.0] * 768)
         if isinstance(input_text, str):
             return embeddings[0]
         return embeddings
