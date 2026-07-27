@@ -27,10 +27,14 @@ class AnalysisViewSet(viewsets.ModelViewSet):
             'report',
         ).distinct()
 
-    def perform_create(self, serializer):
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
         analysis = serializer.save(user=self.request.user)
         from .tasks import run_analysis_pipeline
         run_analysis_pipeline.delay(str(analysis.id))
+        out = AnalysisSerializer(analysis, context=self.get_serializer_context())
+        return Response(out.data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['get'])
     def status(self, request, pk=None):

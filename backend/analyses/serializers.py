@@ -44,7 +44,7 @@ class ReportSerializer(serializers.ModelSerializer):
 class AnalysisRunSerializer(serializers.ModelSerializer):
     class Meta:
         model = AnalysisRun
-        fields = ['id', 'step', 'status', 'started_at', 'completed_at', 'error']
+        fields = ['id', 'step', 'status', 'started_at', 'completed_at', 'error', 'output']
         read_only_fields = ['id', 'started_at', 'completed_at']
 
 class AnalysisSerializer(serializers.ModelSerializer):

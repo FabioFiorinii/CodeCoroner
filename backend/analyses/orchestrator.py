@@ -31,17 +31,21 @@ class AnalysisOrchestrator:
             self._update_status(Analysis.Status.ANALYZING)
             self._record_run('analyze_input')
             self._analyze_input()
+            self._mark_completed('analyze_input')
 
             self._update_status(Analysis.Status.BUG_LOCALIZATION)
             self._record_run('bug_localization')
             self._localize_bug()
+            self._mark_completed('bug_localization')
 
             self._update_status(Analysis.Status.RCA)
             self._record_run('root_cause')
             self._root_cause()
+            self._mark_completed('root_cause')
 
             self._record_run('generate_report')
             self._generate_report()
+            self._mark_completed('generate_report')
 
             self._update_status(Analysis.Status.COMPLETED)
             self._record_run('completed', status='completed')
@@ -63,12 +67,21 @@ class AnalysisOrchestrator:
         self.analysis.save(update_fields=['status'])
         self._broadcast_status()
 
+    def _mark_completed(self, step):
+        AnalysisRun.objects.filter(analysis=self.analysis, step=step).update(
+            status='completed',
+            completed_at=time.time(),
+        )
+
     def _record_run(self, step, status='running', error=''):
-        AnalysisRun.objects.create(
+        AnalysisRun.objects.update_or_create(
             analysis=self.analysis,
             step=step,
-            status=status,
-            error=error,
+            defaults={
+                'status': status,
+                'error': error,
+                'completed_at': time.time() if status in ('completed', 'failed') else None,
+            },
         )
         self._broadcast_status()
 
