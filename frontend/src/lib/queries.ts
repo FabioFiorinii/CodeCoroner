@@ -127,6 +127,8 @@ export function useRepository(id: string | undefined) {
     queryKey: [REPOS_KEY, id],
     queryFn: () => api.get(`/repositories/${id}/`),
     enabled: !!id,
+    refetchInterval: (query) =>
+      query.state.data?.status === 'indexing' || query.state.data?.status === 'cloning' ? 3000 : false,
   })
 }
 
