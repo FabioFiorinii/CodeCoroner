@@ -1,5 +1,5 @@
-import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Trash2, Edit3, Users, GitBranch, Clock } from 'lucide-react'
+import { useParams, useNavigate, Link } from 'react-router-dom'
+import { ArrowLeft, Trash2, Edit3, Users, GitBranch, Clock, ChevronRight } from 'lucide-react'
 import { useProject, useDeleteProject } from '../lib/queries'
 import { Card } from '../components/common/Card'
 import { Button } from '../components/common/Button'
@@ -90,6 +90,25 @@ export function ProjectDetailPage() {
           <p className="text-xs text-text-muted">Created</p>
         </Card>
       </div>
+
+      <Link to={`/projects/${id}/repos`} className="block group">
+        <Card hover padding="lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <GitBranch className="w-5 h-5 text-primary" />
+              <div>
+                <h3 className="font-semibold text-text-primary group-hover:text-primary transition-colors">
+                  Repositories
+                </h3>
+                <p className="text-sm text-text-muted">
+                  {project.repo_count} repository{project.repo_count !== 1 ? 'ies' : 'y'}
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-text-muted group-hover:text-primary transition-colors" />
+          </div>
+        </Card>
+      </Link>
 
       <Card padding="lg">
         <h3 className="font-semibold text-text-primary mb-4">Members</h3>

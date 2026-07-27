@@ -5,6 +5,9 @@ import { RegisterPage } from './pages/RegisterPage'
 import { ProjectListPage } from './pages/ProjectListPage'
 import { ProjectNewPage } from './pages/ProjectNewPage'
 import { ProjectDetailPage } from './pages/ProjectDetailPage'
+import { RepositoryListPage } from './pages/RepositoryListPage'
+import { RepositoryNewPage } from './pages/RepositoryNewPage'
+import { RepositoryDetailPage } from './pages/RepositoryDetailPage'
 import { ProtectedRoute } from './components/common/ProtectedRoute'
 
 function App() {
@@ -26,6 +29,9 @@ function App() {
           <Route path="projects" element={<ProjectListPage />} />
           <Route path="projects/new" element={<ProjectNewPage />} />
           <Route path="projects/:id" element={<ProjectDetailPage />} />
+          <Route path="projects/:projectId/repos" element={<RepositoryListPage />} />
+          <Route path="projects/:projectId/repos/new" element={<RepositoryNewPage />} />
+          <Route path="projects/:projectId/repos/:repoId" element={<RepositoryDetailPage />} />
           <Route path="analyses" element={<div>Analyses</div>} />
           <Route path="analyses/:id" element={<div>Analysis Detail</div>} />
         </Route>
