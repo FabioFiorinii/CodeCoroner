@@ -4,9 +4,9 @@ from django.db import migrations
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("analyses", "0001_initial"),
+        ('analyses', '0001_initial'),
     ]
 
     operations = [
-        CreateExtension("vector"),
+        CreateExtension('vector'),
     ]
