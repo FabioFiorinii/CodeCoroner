@@ -1,13 +1,20 @@
 import time
 import json
 import logging
+import httpx
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+from django.conf import settings
 from django.db import transaction
+from pgvector.django import CosineDistance
 
 from .models import Analysis, AnalysisRun, BugLocalization, SuspiciousFileScore, RootCause, Report
+from repositories.models import ChunkEmbedding, CodeChunk
 
 logger = logging.getLogger(__name__)
+
+AI_URL = getattr(settings, 'AI_ENGINE_URL', 'http://ai-engine:8002')
+
 
 class AnalysisOrchestrator:
     def __init__(self, analysis: Analysis):
@@ -33,8 +40,11 @@ class AnalysisOrchestrator:
             self._record_run('root_cause')
             self._root_cause()
 
+            self._record_run('generate_report')
+            self._generate_report()
+
             self._update_status(Analysis.Status.COMPLETED)
-            self._record_run('report', status='completed')
+            self._record_run('completed', status='completed')
 
         except Exception as e:
             logger.exception(f'Analysis {self.analysis.id} failed')
@@ -85,11 +95,163 @@ class AnalysisOrchestrator:
             from repositories.tasks import index_repository_task
             index_repository_task(str(repo.id))
 
+    def _call_ai(self, endpoint: str, payload: dict, timeout: int = 300) -> dict:
+        resp = httpx.post(f'{AI_URL}/{endpoint}', json=payload, timeout=timeout)
+        resp.raise_for_status()
+        return resp.json()
+
     def _analyze_input(self):
-        pass
+        result = self._call_ai('analyze-logs', {
+            'error_context': self.analysis.error_context,
+        })
+        self.log_analysis = result
+        AnalysisRun.objects.filter(
+            analysis=self.analysis, step='analyze_input'
+        ).update(output=result)
 
     def _localize_bug(self):
-        pass
+        ctx = self.analysis.error_context
+        error_text = json.dumps(ctx.get('error_message', '') or ctx.get('description', '') or ctx)
+
+        embed_resp = self._call_ai('embed', {
+            'texts': [error_text],
+            'model': 'nomic-embed-text',
+        })
+        embeddings = embed_resp.get('embeddings', [])
+        if not embeddings:
+            raise RuntimeError('Failed to get query embedding')
+        query_vector = embeddings[0]
+
+        repo_id = self.analysis.repository_id
+        similar = ChunkEmbedding.objects.filter(
+            chunk__file__repository_id=repo_id,
+        ).annotate(
+            distance=CosineDistance('embedding', query_vector)
+        ).select_related('chunk', 'chunk__file').order_by('distance')[:30]
+
+        chunks_for_ai = []
+        for ce in similar:
+            chunk = ce.chunk
+            chunks_for_ai.append({
+                'file_path': chunk.file.file_path,
+                'language': chunk.file.language,
+                'content': chunk.content,
+                'start_line': chunk.start_line,
+                'end_line': chunk.end_line,
+                'similarity': float(1.0 - ce.distance) if hasattr(ce, 'distance') else 0,
+            })
+        self.top_chunks = chunks_for_ai
+
+        result = self._call_ai('localize-bug', {
+            'repo_id': str(self.analysis.repository_id),
+            'error_context': ctx,
+            'log_analysis': self.log_analysis,
+            'chunks': chunks_for_ai,
+        })
+        self.localization_result = result
+
+        suspicious = result.get('suspicious_files', [])
+        if suspicious:
+            bug_loc = BugLocalization.objects.create(
+                analysis=self.analysis,
+                summary=result.get('summary', ''),
+            )
+            for item in suspicious:
+                SuspiciousFileScore.objects.create(
+                    localization=bug_loc,
+                    file_path=item.get('file_path', ''),
+                    suspicion_score=item.get('score', 0.0),
+                    evidence=item.get('evidence', ''),
+                    rank=item.get('rank', 0),
+                )
+
+        AnalysisRun.objects.filter(
+            analysis=self.analysis, step='bug_localization'
+        ).update(output=result)
 
     def _root_cause(self):
-        pass
+        suspicious = []
+        if hasattr(self.analysis, 'bug_localization'):
+            suspicious = list(
+                self.analysis.bug_localization.suspicious_files.all().values(
+                    'file_path', 'suspicion_score', 'evidence', 'rank'
+                )
+            )
+
+        top_paths = {s['file_path'] for s in suspicious[:5]}
+        root_chunks = [c for c in getattr(self, 'top_chunks', []) if c['file_path'] in top_paths]
+
+        result = self._call_ai('analyze-root-cause', {
+            'repo_id': str(self.analysis.repository_id),
+            'error_context': self.analysis.error_context,
+            'log_analysis': self.log_analysis,
+            'suspicious_files': suspicious,
+            'chunks': root_chunks,
+        })
+        self.rca_result = result
+
+        RootCause.objects.create(
+            analysis=self.analysis,
+            summary=result.get('summary', ''),
+            root_file=result.get('root_file', ''),
+            root_line=result.get('root_line'),
+            cause_chain=result.get('cause_chain', ''),
+            confidence=result.get('confidence', 0.0),
+            reasoning=result.get('reasoning', ''),
+        )
+
+        AnalysisRun.objects.filter(
+            analysis=self.analysis, step='root_cause'
+        ).update(output=result)
+
+    def _generate_report(self):
+        bug_loc = None
+        if hasattr(self.analysis, 'bug_localization'):
+            bl = self.analysis.bug_localization
+            bug_loc = {
+                'summary': bl.summary,
+                'suspicious_files': list(bl.suspicious_files.all().values(
+                    'file_path', 'suspicion_score', 'evidence', 'rank'
+                )),
+            }
+
+        rca = None
+        if hasattr(self.analysis, 'root_cause'):
+            rc = self.analysis.root_cause
+            rca = {
+                'summary': rc.summary,
+                'root_file': rc.root_file,
+                'root_line': rc.root_line,
+                'cause_chain': rc.cause_chain,
+                'confidence': rc.confidence,
+                'reasoning': rc.reasoning,
+            }
+
+        repo_info = {
+            'id': str(self.analysis.repository.id),
+            'git_url': self.analysis.repository.git_url,
+            'git_branch': self.analysis.repository.git_branch,
+        }
+
+        analysis_data = {
+            'title': self.analysis.title,
+            'error_context': self.analysis.error_context,
+            'log_analysis': self.log_analysis,
+            'bug_localization': bug_loc,
+            'root_cause': rca,
+            'repository': repo_info,
+        }
+
+        result = self._call_ai('generate-report', {
+            'analysis_data': analysis_data,
+        })
+
+        Report.objects.create(
+            analysis=self.analysis,
+            markdown=result.get('markdown', ''),
+            format='markdown',
+        )
+
+        AnalysisRun.objects.filter(
+            analysis=self.analysis, step='generate_report'
+        ).update(output=result)
