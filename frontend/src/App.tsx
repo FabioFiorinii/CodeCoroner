@@ -12,6 +12,7 @@ import { ProtectedRoute } from './components/common/ProtectedRoute'
 import { AnalysisListPage } from './pages/AnalysisListPage'
 import { AnalysisNewPage } from './pages/AnalysisNewPage'
 import { AnalysisDetailPage } from './pages/AnalysisDetailPage'
+import { DashboardPage } from './pages/DashboardPage'
 
 function App() {
   return (
@@ -28,7 +29,7 @@ function App() {
           }
         >
           <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard" element={<div>Dashboard</div>} />
+          <Route path="dashboard" element={<DashboardPage />} />
           <Route path="projects" element={<ProjectListPage />} />
           <Route path="projects/new" element={<ProjectNewPage />} />
           <Route path="projects/:id" element={<ProjectDetailPage />} />
@@ -38,8 +39,8 @@ function App() {
           <Route path="projects/:projectId/analyses" element={<AnalysisListPage />} />
           <Route path="projects/:projectId/analyses/new" element={<AnalysisNewPage />} />
           <Route path="projects/:projectId/analyses/:id" element={<AnalysisDetailPage />} />
-          <Route path="analyses" element={<AnalysisListPage />} />
-          <Route path="analyses/:id" element={<AnalysisDetailPage />} />
+          <Route path="analyses" element={<Navigate to="/projects" replace />} />
+          <Route path="analyses/:id" element={<Navigate to="/projects" replace />} />
         </Route>
       </Routes>
     </BrowserRouter>

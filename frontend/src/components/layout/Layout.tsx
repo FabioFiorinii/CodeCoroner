@@ -4,7 +4,6 @@ import { useAuthStore } from '../../stores/authStore'
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: '▦' },
   { to: '/projects', label: 'Projects', icon: '⚙' },
-  { to: '/analyses', label: 'Analyses', icon: '◉' },
 ]
 
 export default function Layout() {

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { Plus, Search, GitBranch, Globe, FileCode, ArrowLeft } from 'lucide-react'
-import { useProjectRepositories } from '../lib/queries'
+import { Plus, Search, GitBranch, Globe, FileCode, ArrowLeft, FolderOpen } from 'lucide-react'
+import { useProject, useProjectRepositories } from '../lib/queries'
 import { Card } from '../components/common/Card'
 import { Button } from '../components/common/Button'
 
@@ -17,6 +17,7 @@ export function RepositoryListPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
   const { data, isLoading, error } = useProjectRepositories(projectId)
+  const { data: project } = useProject(projectId)
   const [search, setSearch] = useState('')
 
   const repos = data?.results?.filter(
@@ -35,6 +36,10 @@ export function RepositoryListPage() {
         </button>
         <div className="flex items-center justify-between">
           <div>
+            <div className="flex items-center gap-2 text-sm text-text-secondary mb-1">
+              <FolderOpen className="w-4 h-4" />
+              <span>{project?.name ?? 'Project'}</span>
+            </div>
             <h1 className="text-[clamp(2.5rem,5vw,4rem)] font-bold text-text-primary leading-tight">
               Repositories
             </h1>

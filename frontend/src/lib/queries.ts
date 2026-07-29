@@ -136,7 +136,12 @@ export function useCreateRepository() {
   const qc = useQueryClient()
   return useMutation<RepositoryItem, Error, RepositoryInput>({
     mutationFn: (data) => api.post<RepositoryItem>('/repositories/', data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: [REPOS_KEY] }),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: [REPOS_KEY] })
+      if (data?.project) {
+        qc.invalidateQueries({ queryKey: [PROJECTS_KEY, data.project] })
+      }
+    },
   })
 }
 
