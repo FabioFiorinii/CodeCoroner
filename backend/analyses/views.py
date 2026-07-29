@@ -1,6 +1,7 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.db.models import Q
 from .models import Analysis
 from .serializers import (
     AnalysisSerializer, AnalysisCreateSerializer,
@@ -18,9 +19,15 @@ class AnalysisViewSet(viewsets.ModelViewSet):
         return AnalysisSerializer
 
     def get_queryset(self):
-        return Analysis.objects.filter(
-            project__memberships__user=self.request.user
-        ).select_related('project', 'repository').prefetch_related(
+        user = self.request.user
+        qs = Analysis.objects.filter(
+            Q(project__memberships__user=user) |
+            Q(project__groups__in=user.groups.all())
+        )
+        project_id = self.request.query_params.get('project')
+        if project_id:
+            qs = qs.filter(project_id=project_id)
+        return qs.distinct().select_related('project', 'repository').prefetch_related(
             'runs',
             'bug_localization__suspicious_files',
             'root_cause',

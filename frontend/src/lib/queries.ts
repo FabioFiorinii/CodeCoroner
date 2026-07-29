@@ -289,7 +289,7 @@ export interface AnalysisInput {
 export function useAnalyses(projectId: string | undefined) {
   return useQuery<{ results: AnalysisItem[] }>({
     queryKey: [ANALYSES_KEY, { project: projectId }],
-    queryFn: () => api.get('/analyses/'),
+    queryFn: () => api.get(`/analyses/?project=${projectId}`),
     enabled: !!projectId,
   })
 }

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 
@@ -9,12 +9,14 @@ interface ProtectedRouteProps {
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { isAuthenticated, isLoading, fetchMe } = useAuthStore()
   const location = useLocation()
+  const fetched = useRef(false)
 
   useEffect(() => {
-    if (!isAuthenticated && !isLoading) {
+    if (!fetched.current && !isLoading) {
+      fetched.current = true
       fetchMe()
     }
-  }, [isAuthenticated, isLoading, fetchMe])
+  }, [isLoading, fetchMe])
 
   if (isLoading) {
     return (
