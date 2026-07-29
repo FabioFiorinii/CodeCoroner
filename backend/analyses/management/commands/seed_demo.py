@@ -53,7 +53,6 @@ class Command(BaseCommand):
 
         repo, _ = Repository.objects.get_or_create(
             git_url='https://github.com/pallets/flask.git',
-            project=project,
             defaults={
                 'git_branch': 'main',
                 'status': Repository.Status.INDEXED,
@@ -61,6 +60,7 @@ class Command(BaseCommand):
                 'total_bytes': 2_456_789,
             },
         )
+        repo.assigned_projects.add(project)
         self.stdout.write(f'  Repository: {repo.git_url}')
 
         analysis_id = uuid.UUID('00000000-0000-4000-8000-000000000001')
