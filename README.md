@@ -8,17 +8,17 @@
 
 ## What is CodeCoroner?
 
-CodeCoroner is an AI-native debugging platform that automates root cause analysis (RCA) and bug fixing. Given a Git repository, logs, stacktraces, and error descriptions, it:
+CodeCoroner is an AI-native debugging platform that automates root cause analysis (RCA) and fix suggestion. Given a Git repository, logs, stacktraces, and error descriptions, it:
 
 1. **Indexes** the repository (AST parsing, semantic chunking)
 2. **Generates embeddings** and stores them in a vector database (pgvector)
-3. **Correlates** logs, stacktraces, and code
+3. **Analyzes** the error context (logs, stacktraces, descriptions)
 4. **Localizes** the bug (ranks suspicious files by probability)
 5. **Performs Root Cause Analysis** via LLM reasoning
 6. **Generates** a comprehensive report
-7. (V1) **Proposes and validates** a candidate patch
+7. **Suggests** a fix with unified diff, AI-ready implementation plan, and detailed explanation
 
-Unlike a simple RAG chatbot, CodeCoroner runs a **multi-agent pipeline** with specialized AI agents (Repository Indexer, Log Analyzer, Bug Localizer, Root Cause Agent, Patch Generator, Validation Agent, Report Generator).
+Unlike a simple RAG chatbot, CodeCoroner runs a **multi-agent pipeline** with specialized AI agents (Repository Indexer, Log Analyzer, Bug Localizer, Root Cause Agent, Patch Generator, Report Generator).
 
 ## Architecture Overview
 
@@ -87,8 +87,8 @@ Unlike a simple RAG chatbot, CodeCoroner runs a **multi-agent pipeline** with sp
 ### AI
 - **Ollama** (local LLM execution)
 - **nomic-embed-text** (768-dim code embeddings)
-- **deepseek-coder**:6.7b/14b (RCA, patch generation)
-- **mistral**:7b (log analysis, report generation)
+- **deepseek-coder:1.3b** (RCA, fix suggestion)
+- **deepseek-coder:6.7b/14b** (RCA, fix suggestion — for production)
 
 ### Infrastructure
 - **Podman** (daemonless container runtime)
@@ -346,31 +346,42 @@ GET    /api/v1/repositories/{id}/chunks/# List code chunks
 
 ### Analyses
 ```
-POST   /api/v1/analyses/                    # Submit analysis
-GET    /api/v1/analyses/                    # List analyses
-GET    /api/v1/analyses/{id}/               # Analysis detail
-GET    /api/v1/analyses/{id}/status/        # Poll status
-GET    /api/v1/analyses/{id}/localization/  # Bug localization results
-GET    /api/v1/analyses/{id}/root-cause/    # Root cause analysis
-GET    /api/v1/analyses/{id}/patch/         # Generated patch (V1)
-GET    /api/v1/analyses/{id}/report/        # Final report
+POST   /api/v1/analyses/                         # Submit analysis
+GET    /api/v1/analyses/                         # List analyses
+GET    /api/v1/analyses/{id}/                    # Analysis detail
+GET    /api/v1/analyses/{id}/status/             # Poll status
+GET    /api/v1/analyses/{id}/localization/       # Bug localization results
+GET    /api/v1/analyses/{id}/root-cause/         # Root cause analysis
+GET    /api/v1/analyses/{id}/fix-suggestion/     # Fix suggestion (diff + plan + explanation)
+GET    /api/v1/analyses/{id}/patch/              # Generated patch (legacy)
+GET    /api/v1/analyses/{id}/report/             # Final report
 ```
 
 WebSocket: `ws://localhost:8080/ws/analyses/{id}/` (real-time status)
 
-## Development Plan (MVP — 3 Months)
+## Development Status
 
-| Week | Milestone |
-|---|---|
-| 1-2 | Foundation: Django, DRF, Celery, PostgreSQL, auth, Podman Compose |
-| 3-4 | Repository indexing: Tree-sitter, chunking, file model |
-| 5-6 | Embeddings: Ollama, pgvector, vector search |
-| 7-8 | Bug localization: Log analyzer, hybrid search, scoring |
-| 9-10 | Root cause analysis: LLM agent, prompt engineering, RCA model |
-| 11-12 | Frontend MVP: Dashboard, project/repo/analysis pages, status timeline |
-| V1 | Patch generation, validation sandbox |
-| V2 | Enterprise: teams, webhooks, CI/CD integration |
-| V3 | SaaS: multi-tenant, SSO, billing, cloud AI providers |
+### ✅ Completed
+- **Foundation** — Django, DRF, Celery, PostgreSQL, auth, Podman Compose
+- **Repository Indexing** — Tree-sitter, chunking (Python, JavaScript, Go, Rust, Java, C/C++)
+- **Embeddings** — Ollama, pgvector, batch processing
+- **Bug Localization** — Log analyzer, hybrid search (vector + FTS), suspicion scoring
+- **Root Cause Analysis** — LLM-driven RCA with confidence scoring
+- **Report Generation** — Multi-section markdown report
+- **Fix Suggestion** — Unified diff + AI-ready fix plan + explanation (V1)
+- **Frontend** — Full SPA: projects, repos, analyses list/detail/create, real-time polling
+- **WebSocket** — Channels + Daphne + real-time status broadcasting
+
+### 🔜 Next
+- **Test Suite** — Backend + frontend + E2E
+- **CI/CD** — GitHub Actions
+- **Sandbox** — Isolated validation container for patch testing
+- **Seed Script** — Demo data for quick-start
+- **Documentation** — API docs, architecture deep-dive
+
+### Future
+- **V2** — Teams, webhooks, CI/CD integration
+- **V3** — SaaS: multi-tenant, SSO, billing, cloud AI providers
 
 ## License
 
