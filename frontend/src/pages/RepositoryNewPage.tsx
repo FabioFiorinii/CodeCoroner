@@ -28,11 +28,11 @@ export function RepositoryNewPage() {
     e.preventDefault()
     if (!validate()) return
     try {
-      await createRepo.mutateAsync({
+      const repo = await createRepo.mutateAsync({
         git_url: gitUrl.trim(),
         git_branch: gitBranch.trim(),
       })
-      navigate('/repositories', { replace: true })
+      navigate(`/repositories/${repo.id}`, { replace: true })
     } catch {
       // error handled by mutation
     }

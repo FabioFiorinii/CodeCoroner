@@ -38,6 +38,7 @@ function App() {
           <Route path="projects/:projectId/repos/:repoId" element={<RepositoryDetailPage />} />
           <Route path="repositories" element={<RepositoryListPage />} />
           <Route path="repositories/new" element={<RepositoryNewPage />} />
+          <Route path="repositories/:repoId" element={<RepositoryDetailPage />} />
           <Route path="projects/:projectId/analyses" element={<AnalysisListPage />} />
           <Route path="projects/:projectId/analyses/new" element={<AnalysisNewPage />} />
           <Route path="projects/:projectId/analyses/:id" element={<AnalysisDetailPage />} />

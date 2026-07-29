@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Plus, Search, GitBranch, Globe, FileCode } from 'lucide-react'
 import { useRepositories } from '../lib/queries'
 import { Card } from '../components/common/Card'
@@ -84,7 +84,11 @@ export function RepositoryListPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {repos?.map((repo) => (
-          <div key={repo.id} className="block group">
+          <Link
+            key={repo.id}
+            to={`/repositories/${repo.id}`}
+            className="block group"
+          >
             <Card hover padding="md" className="h-full">
               <div className="flex items-start justify-between mb-3">
                 <Globe className="w-5 h-5 text-primary mt-0.5" />
@@ -94,7 +98,7 @@ export function RepositoryListPage() {
                   {repo.status}
                 </span>
               </div>
-              <h3 className="font-semibold text-text-primary text-sm truncate">
+              <h3 className="font-semibold text-text-primary group-hover:text-primary transition-colors text-sm truncate">
                 {repo.git_url}
               </h3>
               <p className="text-sm text-text-secondary mt-1 flex items-center gap-1">
@@ -118,7 +122,7 @@ export function RepositoryListPage() {
                 Assigned to {repo.assigned_projects?.length ?? 0} project(s)
               </div>
             </Card>
-          </div>
+          </Link>
         ))}
       </div>
     </div>

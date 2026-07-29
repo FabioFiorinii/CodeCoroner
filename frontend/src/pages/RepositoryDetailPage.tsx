@@ -29,7 +29,7 @@ const STATUS_COLOR: Record<string, string> = {
 }
 
 export function RepositoryDetailPage() {
-  const { projectId, repoId } = useParams<{ projectId: string; repoId: string }>()
+  const { repoId } = useParams<{ repoId: string }>()
   const navigate = useNavigate()
   const { data: repo, isLoading, error } = useRepository(repoId)
   const deleteRepo = useDeleteRepository()
@@ -43,7 +43,7 @@ export function RepositoryDetailPage() {
     if (!window.confirm('Delete this repository permanently? Indexed data will be lost.')) return
     try {
       await deleteRepo.mutateAsync(repoId!)
-      navigate(-1)
+      navigate('/repositories')
     } catch {
       // error handled by mutation
     }
@@ -68,7 +68,7 @@ export function RepositoryDetailPage() {
     return (
       <Card padding="lg" className="max-w-3xl mx-auto text-center">
         <p className="text-red-500 font-medium">Repository not found</p>
-        <Button variant="ghost" className="mt-4" onClick={() => navigate(`/projects/${projectId}/repos`)}>
+        <Button variant="ghost" className="mt-4" onClick={() => navigate('/repositories')}>
           Back to Repositories
         </Button>
       </Card>
@@ -82,7 +82,7 @@ export function RepositoryDetailPage() {
     <div className="max-w-3xl mx-auto space-y-6">
       <div>
         <button
-          onClick={() => navigate(`/projects/${projectId}/repos`)}
+          onClick={() => navigate('/repositories')}
           className="flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
