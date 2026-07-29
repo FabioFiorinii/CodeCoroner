@@ -25,6 +25,9 @@ lint:
 shell:
 	podman-compose exec django python manage.py shell
 
+seed:
+	podman-compose exec django python manage.py seed_demo
+
 superuser:
 	podman-compose exec django python manage.py createsuperuser
 

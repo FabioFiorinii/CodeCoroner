@@ -250,6 +250,7 @@ make build    # Ricostruisce le immagini
 make migrate  # Esegue le migrazioni DB
 make test     # Esegue i test
 make shell    # Apre Django shell
+make seed     # Popola il DB con dati demo (utente: demo@codecoroner.dev / demodemo)
 make superuser # Crea superuser
 make clean    # Ferma tutto e pulisce i volumi (cancella TUTTE le immagini in cache!)
 ```
