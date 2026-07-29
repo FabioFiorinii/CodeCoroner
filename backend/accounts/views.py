@@ -1,7 +1,42 @@
-from rest_framework import generics, permissions, status
+from rest_framework import generics, permissions, status, viewsets, serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from django.contrib.auth.models import Group
 from .serializers import RegisterSerializer, LoginSerializer, UserSerializer
+from .models import User
+
+
+class IsSuperUser(permissions.BasePermission):
+    def has_permission(self, request, view):
+        return request.user and request.user.is_authenticated and request.user.is_superuser
+
+
+class UserAdminViewSet(viewsets.ModelViewSet):
+    queryset = User.objects.all().order_by('-date_joined')
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated, IsSuperUser]
+
+    def perform_destroy(self, instance):
+        if instance == self.request.user:
+            raise serializers.ValidationError('Cannot delete yourself')
+        instance.delete()
+
+
+class GroupSerializer(serializers.ModelSerializer):
+    user_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Group
+        fields = ['id', 'name', 'user_count']
+
+    def get_user_count(self, obj):
+        return obj.user_set.count()
+
+
+class GroupViewSet(viewsets.ModelViewSet):
+    queryset = Group.objects.all().order_by('name')
+    serializer_class = GroupSerializer
+    permission_classes = [permissions.IsAuthenticated, IsSuperUser]
 
 class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer

@@ -23,6 +23,7 @@ class Repository(models.Model):
         related_name='assigned_repositories',
         blank=True,
     )
+    groups = models.ManyToManyField('auth.Group', related_name='repositories', blank=True)
     git_url = models.CharField(max_length=2048)
     git_branch = models.CharField(max_length=255, default='main')
     local_path = models.CharField(max_length=1024, null=True, blank=True)

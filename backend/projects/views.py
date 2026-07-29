@@ -13,17 +13,22 @@ class IsProjectMember(permissions.BasePermission):
             project = obj.project
         else:
             project = obj
-        return project.memberships.filter(user=request.user).exists()
+        if project.memberships.filter(user=request.user).exists():
+            return True
+        return project.groups.filter(id__in=request.user.groups.all()).exists()
 
 class ProjectViewSet(viewsets.ModelViewSet):
     serializer_class = ProjectSerializer
     permission_classes = [permissions.IsAuthenticated, IsProjectMember]
 
     def get_queryset(self):
-        return Project.objects.filter(
+        qs = Project.objects.filter(
             Q(created_by=self.request.user) |
             Q(memberships__user=self.request.user)
-        ).distinct().prefetch_related('memberships__user').order_by('-created_at')
+        )
+        if not self.request.user.is_superuser:
+            qs = qs.filter(groups__in=self.request.user.groups.all())
+        return qs.distinct().prefetch_related('memberships__user').order_by('-created_at')
 
     @action(detail=True, methods=['get', 'post'])
     def members(self, request, pk=None):
@@ -56,4 +61,6 @@ class ProjectViewSet(viewsets.ModelViewSet):
             repo_ids = request.data.get('repository_ids', [])
             repos = Repository.objects.filter(id__in=repo_ids)
             project.assigned_repositories.set(repos)
+            for repo in repos:
+                repo.groups.add(*project.groups.all())
             return Response({'status': 'ok', 'assigned_count': repos.count()})

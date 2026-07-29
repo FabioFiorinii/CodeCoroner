@@ -1,5 +1,6 @@
 import re
 from rest_framework import serializers
+from django.contrib.auth.models import Group
 from .models import Repository, IndexedFile, CodeChunk, ChunkEmbedding
 
 
@@ -19,10 +20,19 @@ class RepositoryCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Invalid git URL format.')
         return value
 
+    def create(self, validated_data):
+        request = self.context.get('request')
+        repo = super().create(validated_data)
+        repo.groups.set(request.user.groups.all())
+        return repo
+
 
 class RepositorySerializer(serializers.ModelSerializer):
     assigned_projects = serializers.SlugRelatedField(
         many=True, read_only=True, slug_field='id',
+    )
+    groups = serializers.SlugRelatedField(
+        many=True, slug_field='name', read_only=True,
     )
 
     class Meta:
@@ -30,9 +40,9 @@ class RepositorySerializer(serializers.ModelSerializer):
         fields = [
             'id', 'git_url', 'git_branch',
             'status', 'file_count', 'total_bytes', 'error_message', 'last_indexed_at',
-            'assigned_projects', 'created_at', 'updated_at',
+            'assigned_projects', 'groups', 'created_at', 'updated_at',
         ]
-        read_only_fields = ['id', 'status', 'file_count', 'total_bytes', 'error_message', 'last_indexed_at', 'assigned_projects', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'status', 'file_count', 'total_bytes', 'error_message', 'last_indexed_at', 'assigned_projects', 'groups', 'created_at', 'updated_at']
 
 class IndexedFileSerializer(serializers.ModelSerializer):
     class Meta:

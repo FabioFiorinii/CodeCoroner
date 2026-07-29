@@ -7,6 +7,8 @@ interface User {
   email: string
   username: string
   is_active: boolean
+  is_superuser: boolean
+  groups: string[]
 }
 
 interface LoginResponse {

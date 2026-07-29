@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
+from django.contrib.auth.models import Group
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import User
 
@@ -16,6 +17,8 @@ class RegisterSerializer(serializers.ModelSerializer):
             username=validated_data['username'],
             password=validated_data['password'],
         )
+        default_group, _ = Group.objects.get_or_create(name='default')
+        user.groups.add(default_group)
         return user
 
 class LoginSerializer(serializers.Serializer):
@@ -34,7 +37,11 @@ class LoginSerializer(serializers.Serializer):
         }
 
 class UserSerializer(serializers.ModelSerializer):
+    groups = serializers.SlugRelatedField(
+        many=True, slug_field='name', queryset=Group.objects.all(),
+    )
+
     class Meta:
         model = User
-        fields = ['id', 'email', 'username', 'is_active', 'date_joined', 'api_rate_limit']
-        read_only_fields = ['id', 'is_active', 'date_joined']
+        fields = ['id', 'email', 'username', 'is_active', 'is_superuser', 'date_joined', 'api_rate_limit', 'groups']
+        read_only_fields = ['id', 'is_active', 'is_superuser', 'date_joined']

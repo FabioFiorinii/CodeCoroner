@@ -3,6 +3,7 @@ from datetime import timedelta
 from django.utils import timezone
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from projects.models import Project, ProjectMembership
 from repositories.models import Repository
 from analyses.models import Analysis, AnalysisRun, BugLocalization, SuspiciousFileScore, RootCause, FixSuggestion, Report
@@ -24,6 +25,8 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         self.stdout.write('Seeding demo data...')
 
+        default_group, _ = Group.objects.get_or_create(name='default')
+
         user, created = User.objects.get_or_create(
             email=DEMO_USER['email'],
             defaults={
@@ -32,10 +35,14 @@ class Command(BaseCommand):
         )
         if created:
             user.set_password(DEMO_USER['password'])
+            user.is_superuser = True
             user.save()
             self.stdout.write(f'  Created user: {user.email}')
         else:
+            user.is_superuser = True
+            user.save(update_fields=['is_superuser'])
             self.stdout.write(f'  Using existing user: {user.email}')
+        user.groups.add(default_group)
 
         project, _ = Project.objects.get_or_create(
             name='Flask Demo',
@@ -49,6 +56,7 @@ class Command(BaseCommand):
             user=user,
             defaults={'role': 'owner'},
         )
+        project.groups.add(default_group)
         self.stdout.write(f'  Project: {project.name}')
 
         repo, _ = Repository.objects.get_or_create(
@@ -61,6 +69,7 @@ class Command(BaseCommand):
             },
         )
         repo.assigned_projects.add(project)
+        repo.groups.add(default_group)
         self.stdout.write(f'  Repository: {repo.git_url}')
 
         analysis_id = uuid.UUID('00000000-0000-4000-8000-000000000001')

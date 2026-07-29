@@ -49,6 +49,24 @@ export default function Layout() {
           ))}
         </nav>
 
+        {user && user.is_superuser && (
+          <div className="px-4 pb-2">
+            <NavLink
+              to="/admin"
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded text-sm font-medium transition-all duration-200 ${
+                  isActive
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-text-inverse/60 hover:bg-white/5 hover:text-text-inverse'
+                }`
+              }
+            >
+              <span className="text-lg">⚙</span>
+              Admin Settings
+            </NavLink>
+          </div>
+        )}
+
         {user && (
           <div className="p-4 border-t border-white/5">
             <div className="flex items-center gap-3 mb-3">

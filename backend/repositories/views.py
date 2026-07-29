@@ -22,7 +22,10 @@ class RepositoryViewSet(viewsets.ModelViewSet):
         return RepositorySerializer
 
     def get_queryset(self):
-        return Repository.objects.all().distinct()
+        qs = Repository.objects.all()
+        if not self.request.user.is_superuser:
+            qs = qs.filter(groups__in=self.request.user.groups.all())
+        return qs.distinct()
 
     def perform_create(self, serializer):
         repo = serializer.save()

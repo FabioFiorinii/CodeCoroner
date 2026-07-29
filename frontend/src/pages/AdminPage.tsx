@@ -1,0 +1,322 @@
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Shield, Users, UserX, Save, Plus, X, Search } from 'lucide-react'
+import { Card } from '../components/common/Card'
+import { Button } from '../components/common/Button'
+import { useAuthStore } from '../stores/authStore'
+import { api } from '../lib/api'
+
+interface AdminUser {
+  id: number
+  email: string
+  username: string
+  is_active: boolean
+  is_superuser: boolean
+  date_joined: string
+  groups: string[]
+}
+
+interface GroupItem {
+  id: number
+  name: string
+  user_count: number
+}
+
+export function AdminPage() {
+  const { user } = useAuthStore()
+  const navigate = useNavigate()
+  const [users, setUsers] = useState<AdminUser[]>([])
+  const [groups, setGroups] = useState<GroupItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [editingUser, setEditingUser] = useState<AdminUser | null>(null)
+  const [editGroups, setEditGroups] = useState<string[]>([])
+  const [showNewGroup, setShowNewGroup] = useState(false)
+  const [newGroupName, setNewGroupName] = useState('')
+
+  useEffect(() => {
+    if (!user?.is_superuser) {
+      navigate('/dashboard', { replace: true })
+      return
+    }
+    loadData()
+  }, [])
+
+  const loadData = async () => {
+    setLoading(true)
+    try {
+      const [usersData, groupsData] = await Promise.all([
+        api.get<AdminUser[]>('/auth/admin/users/'),
+        api.get<GroupItem[]>('/auth/admin/groups/'),
+      ])
+      setUsers(usersData)
+      setGroups(groupsData)
+    } catch (err) {
+      console.error('Failed to load admin data', err)
+    }
+    setLoading(false)
+  }
+
+  const filteredUsers = users.filter(
+    (u) =>
+      u.email.toLowerCase().includes(search.toLowerCase()) ||
+      u.username.toLowerCase().includes(search.toLowerCase()),
+  )
+
+  const handleDeleteUser = async (userId: number, userEmail: string) => {
+    if (!confirm(`Delete user ${userEmail}? This cannot be undone.`)) return
+    try {
+      await api.delete(`/auth/admin/users/${userId}/`)
+      loadData()
+    } catch (err) {
+      console.error('Failed to delete user', err)
+    }
+  }
+
+  const handleSaveUser = async () => {
+    if (!editingUser) return
+    try {
+      await api.patch(`/auth/admin/users/${editingUser.id}/`, {
+        groups: editGroups,
+      })
+      setEditingUser(null)
+      loadData()
+    } catch (err) {
+      console.error('Failed to update user', err)
+    }
+  }
+
+  const handleCreateGroup = async () => {
+    if (!newGroupName.trim()) return
+    try {
+      await api.post('/auth/admin/groups/', { name: newGroupName.trim() })
+      setNewGroupName('')
+      setShowNewGroup(false)
+      loadData()
+    } catch (err) {
+      console.error('Failed to create group', err)
+    }
+  }
+
+  const handleDeleteGroup = async (groupId: number, groupName: string) => {
+    if (!confirm(`Delete group "${groupName}"?`)) return
+    try {
+      await api.delete(`/auth/admin/groups/${groupId}/`)
+      loadData()
+    } catch (err) {
+      console.error('Failed to delete group', err)
+    }
+  }
+
+  if (!user?.is_superuser) {
+    return null
+  }
+
+  return (
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-text-primary flex items-center gap-2">
+            <Shield className="w-6 h-6" />
+            Admin Settings
+          </h1>
+          <p className="text-text-secondary mt-1">
+            Manage users, groups, and permissions.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-text-primary flex items-center gap-2">
+              <Users className="w-5 h-5" />
+              Users ({users.length})
+            </h2>
+            <div className="relative max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+              <input
+                className="input-field pl-9 py-1.5 text-sm"
+                placeholder="Search users..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-16 bg-surface-alt rounded-lg animate-pulse" />
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {filteredUsers.map((u) => (
+                <Card key={u.id} padding="md">
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-text-primary">{u.username}</p>
+                        {u.is_superuser && (
+                          <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
+                            Admin
+                          </span>
+                        )}
+                        {!u.is_active && (
+                          <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">
+                            Inactive
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-text-muted">{u.email}</p>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {u.groups.map((g) => (
+                          <span
+                            key={g}
+                            className="text-xs bg-surface-alt text-text-secondary px-2 py-0.5 rounded"
+                          >
+                            {g}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0 ml-4">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setEditingUser(u)
+                          setEditGroups([...u.groups])
+                        }}
+                      >
+                        Edit Groups
+                      </Button>
+                      {!u.is_superuser && (
+                        <button
+                          onClick={() => handleDeleteUser(u.id, u.email)}
+                          className="p-2 text-text-muted hover:text-red-500 transition-colors"
+                          title="Delete user"
+                        >
+                          <UserX className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              ))}
+              {filteredUsers.length === 0 && (
+                <p className="text-sm text-text-muted text-center py-8">No users found.</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-text-primary">Groups</h2>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowNewGroup(true)}
+            >
+              <Plus className="w-4 h-4" />
+              New Group
+            </Button>
+          </div>
+
+          {showNewGroup && (
+            <div className="flex items-center gap-2">
+              <input
+                className="input-field flex-1 py-1.5 text-sm"
+                placeholder="Group name"
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleCreateGroup()}
+              />
+              <Button variant="ghost" size="sm" onClick={handleCreateGroup}>
+                <Save className="w-4 h-4" />
+              </Button>
+              <button
+                onClick={() => {
+                  setShowNewGroup(false)
+                  setNewGroupName('')
+                }}
+                className="p-1 text-text-muted hover:text-text-primary"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            {groups.map((g) => (
+              <Card key={g.id} padding="sm" className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-text-primary">{g.name}</p>
+                  <p className="text-xs text-text-muted">{g.user_count} user(s)</p>
+                </div>
+                {g.name !== 'default' && (
+                  <button
+                    onClick={() => handleDeleteGroup(g.id, g.name)}
+                    className="p-1 text-text-muted hover:text-red-500 transition-colors"
+                    title="Delete group"
+                  >
+                    <UserX className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </Card>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {editingUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card padding="lg" className="w-full max-w-md mx-4">
+            <h3 className="font-semibold text-text-primary mb-4">
+              Edit Groups — {editingUser.email}
+            </h3>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {groups.map((g) => {
+                const isSelected = editGroups.includes(g.name)
+                return (
+                  <label
+                    key={g.id}
+                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                      isSelected ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() =>
+                        setEditGroups((prev) =>
+                          isSelected ? prev.filter((n) => n !== g.name) : [...prev, g.name],
+                        )
+                      }
+                      className="w-4 h-4 accent-primary"
+                    />
+                    <div>
+                      <p className="text-sm font-medium text-text-primary">{g.name}</p>
+                      <p className="text-xs text-text-muted">{g.user_count} users</p>
+                    </div>
+                  </label>
+                )
+              })}
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <Button variant="ghost" onClick={() => setEditingUser(null)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSaveUser}>
+                <Save className="w-4 h-4" />
+                Save
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+    </div>
+  )
+}
