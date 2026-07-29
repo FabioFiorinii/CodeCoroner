@@ -31,6 +31,11 @@ class Analysis(models.Model):
         on_delete=models.CASCADE,
         related_name='analyses',
     )
+    repositories = models.ManyToManyField(
+        'repositories.Repository',
+        related_name='analysis_records',
+        blank=True,
+    )
     title = models.CharField(max_length=255, blank=True, default='')
     error_context = models.JSONField(default=dict)
     status = models.CharField(

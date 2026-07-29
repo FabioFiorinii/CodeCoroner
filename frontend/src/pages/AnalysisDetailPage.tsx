@@ -1,7 +1,7 @@
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, Clock, CheckCircle2, AlertCircle, Loader2,
-  FileCode, Target, FileSearch, BookOpen, Wrench,
+  FileCode, Target, FileSearch, BookOpen, Wrench, GitBranch, Globe,
 } from 'lucide-react'
 import { useAnalysis } from '../lib/queries'
 import { Card } from '../components/common/Card'
@@ -85,6 +85,32 @@ export function AnalysisDetailPage() {
           {analysis.duration_seconds ? ` · ${formatDuration(analysis.duration_seconds)}` : ''}
         </p>
       </div>
+
+      {analysis.repositories && analysis.repositories.length > 0 && (
+        <Card padding="md">
+          <h3 className="font-semibold text-text-primary flex items-center gap-2 mb-3 text-sm">
+            <Globe className="w-4 h-4" />
+            Analyzed Repositories
+          </h3>
+          <div className="space-y-2">
+            {analysis.repositories.map((r) => (
+              <Link
+                key={r.id}
+                to={`/repositories/${r.id}`}
+                className="flex items-center gap-3 p-2.5 rounded-lg border border-border hover:border-primary/50 transition-colors group"
+              >
+                <GitBranch className="w-4 h-4 text-primary shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-text-primary group-hover:text-primary transition-colors truncate">
+                    {r.git_url}
+                  </p>
+                  <p className="text-xs text-text-muted">{r.git_branch}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <div className={`border rounded-lg p-4 ${STATUS_COLOR[analysis.status] || 'border-gray-200'}`}>
         <div className="flex items-center gap-2">

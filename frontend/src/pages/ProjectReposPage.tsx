@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, GitBranch, Globe, CheckSquare, Square } from 'lucide-react'
+import { ArrowLeft, GitBranch, Globe, CheckSquare, Square, Search } from 'lucide-react'
 import { useProject, useRepositories, useProjectAssignedRepos, useAssignProjectRepos } from '../lib/queries'
 import { Card } from '../components/common/Card'
 import { Button } from '../components/common/Button'
@@ -12,6 +12,7 @@ export function ProjectReposPage() {
   const { data: allRepos } = useRepositories()
   const { data: assignedRepos } = useProjectAssignedRepos(projectId)
   const assignMutation = useAssignProjectRepos(projectId)
+  const [search, setSearch] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [saved, setSaved] = useState(false)
 
@@ -21,7 +22,9 @@ export function ProjectReposPage() {
     }
   }, [assignedRepos])
 
-  const repos = allRepos?.results ?? []
+  const repos = (allRepos?.results ?? []).filter(
+    (r) => r.git_url.toLowerCase().includes(search.toLowerCase()),
+  )
   const toggle = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev)
@@ -51,8 +54,18 @@ export function ProjectReposPage() {
         <h1 className="text-2xl font-bold text-text-primary">{project?.name ?? 'Project'}</h1>
         <p className="text-text-secondary mt-1">
           Select which repositories are assigned to this project.
-          {repos.length === 0 && ' No repositories available globally. Add one first.'}
+          {allRepos?.results?.length === 0 && ' No repositories available globally. Add one first.'}
         </p>
+      </div>
+
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+        <input
+          className="input-field pl-10"
+          placeholder="Search repositories..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
       </div>
 
       {repos.length === 0 ? (

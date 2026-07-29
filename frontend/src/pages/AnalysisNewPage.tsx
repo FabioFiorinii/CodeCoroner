@@ -12,7 +12,7 @@ export function AnalysisNewPage() {
   const createAnalysis = useCreateAnalysis()
   const repos = reposData ?? []
 
-  const [repoId, setRepoId] = useState('')
+  const [selectedRepoIds, setSelectedRepoIds] = useState<Set<string>>(new Set())
   const [title, setTitle] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
   const [stacktrace, setStacktrace] = useState('')
@@ -20,9 +20,18 @@ export function AnalysisNewPage() {
   const [description, setDescription] = useState('')
   const [steps, setSteps] = useState('')
 
+  const toggleRepo = (id: string) => {
+    setSelectedRepoIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!repoId || !errorMessage) return
+    if (selectedRepoIds.size === 0 || !errorMessage) return
 
     const errorContext: Record<string, unknown> = { error_message: errorMessage }
     if (stacktrace) errorContext.stacktrace = stacktrace
@@ -30,9 +39,13 @@ export function AnalysisNewPage() {
     if (description) errorContext.description = description
     if (steps) errorContext.steps_to_reproduce = steps
 
+    const primaryRepoId = repos.find((r) => selectedRepoIds.has(r.id))?.id ?? repos[0]?.id
+    if (!primaryRepoId) return
+
     const result = await createAnalysis.mutateAsync({
       project: projectId!,
-      repository: repoId,
+      repository: primaryRepoId,
+      repository_ids: Array.from(selectedRepoIds),
       title: title || errorMessage,
       error_context: errorContext,
     })
@@ -54,20 +67,34 @@ export function AnalysisNewPage() {
       <form onSubmit={handleSubmit} className="space-y-4">
         <Card padding="lg" className="space-y-4">
           <div>
-            <label className="label-field">Repository</label>
-            <select
-              className="input-field"
-              value={repoId}
-              onChange={(e) => setRepoId(e.target.value)}
-              required
-            >
-              <option value="">Select a repository...</option>
-              {repos.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.git_url} ({r.git_branch})
-                </option>
-              ))}
-            </select>
+            <label className="label-field">Repositories *</label>
+            <div className="space-y-2 mt-1">
+              {repos.map((r) => {
+                const isSelected = selectedRepoIds.has(r.id)
+                return (
+                  <label
+                    key={r.id}
+                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                      isSelected ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border hover:border-primary/50'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleRepo(r.id)}
+                      className="w-4 h-4 accent-primary"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-text-primary truncate">{r.git_url}</p>
+                      <p className="text-xs text-text-muted">{r.git_branch}</p>
+                    </div>
+                  </label>
+                )
+              })}
+              {repos.length === 0 && (
+                <p className="text-sm text-text-muted">No repositories assigned to this project.</p>
+              )}
+            </div>
           </div>
 
           <div>
@@ -133,7 +160,7 @@ export function AnalysisNewPage() {
         </Card>
 
         <div className="flex justify-end">
-          <Button type="submit" loading={createAnalysis.isPending} disabled={!repoId || !errorMessage}>
+          <Button type="submit" loading={createAnalysis.isPending} disabled={selectedRepoIds.size === 0 || !errorMessage}>
             <Send className="w-4 h-4" />
             Start Analysis
           </Button>

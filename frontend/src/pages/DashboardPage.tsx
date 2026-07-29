@@ -1,5 +1,5 @@
 import { useNavigate, Link } from 'react-router-dom'
-import { useProjects } from '../lib/queries'
+import { useProjects, useRepositories } from '../lib/queries'
 import { Card } from '../components/common/Card'
 import { Button } from '../components/common/Button'
 import { useAuthStore } from '../stores/authStore'
@@ -8,6 +8,7 @@ import { Plus, FolderOpen, GitBranch, Bug, ArrowRight } from 'lucide-react'
 export function DashboardPage() {
   const { user } = useAuthStore()
   const { data: projectsData, isLoading: projectsLoading } = useProjects()
+  const { data: reposData } = useRepositories()
   const navigate = useNavigate()
 
   const projects = projectsData?.results ?? []
@@ -50,7 +51,7 @@ export function DashboardPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-text-primary">
-                {projects.reduce((sum, p) => sum + (p.repo_count ?? 0), 0)}
+                {reposData?.results?.length ?? 0}
               </p>
               <p className="text-sm text-text-muted">Repositories</p>
             </div>

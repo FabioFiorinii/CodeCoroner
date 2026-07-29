@@ -3,6 +3,13 @@ from .models import (
     Analysis, AnalysisRun, BugLocalization, SuspiciousFileScore,
     RootCause, Patch, PatchValidation, Report, FixSuggestion,
 )
+from repositories.models import Repository
+
+
+class RepositoryBasicSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Repository
+        fields = ['id', 'git_url', 'git_branch', 'status']
 
 class SuspiciousFileScoreSerializer(serializers.ModelSerializer):
     class Meta:
@@ -59,11 +66,13 @@ class AnalysisSerializer(serializers.ModelSerializer):
     patch = PatchSerializer(read_only=True)
     fix_suggestion = FixSuggestionSerializer(read_only=True)
     report = ReportSerializer(read_only=True)
+    repositories = RepositoryBasicSerializer(many=True, read_only=True)
 
     class Meta:
         model = Analysis
         fields = [
-            'id', 'user', 'project', 'repository', 'title', 'error_context',
+            'id', 'user', 'project', 'repository', 'repositories',
+            'title', 'error_context',
             'status', 'created_at', 'completed_at', 'duration_seconds',
             'error_message', 'runs', 'bug_localization', 'root_cause',
             'patch', 'fix_suggestion', 'report',
@@ -75,13 +84,28 @@ class AnalysisSerializer(serializers.ModelSerializer):
         ]
 
 class AnalysisCreateSerializer(serializers.ModelSerializer):
+    repository_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        write_only=True,
+        required=False,
+    )
+
     class Meta:
         model = Analysis
         fields = [
-            'project', 'repository', 'title', 'error_context',
+            'project', 'repository', 'repository_ids', 'title', 'error_context',
         ]
 
     def validate_error_context(self, value):
         if not isinstance(value, dict):
             raise serializers.ValidationError('error_context must be a JSON object')
         return value
+
+    def create(self, validated_data):
+        repo_ids = validated_data.pop('repository_ids', None)
+        analysis = super().create(validated_data)
+        if repo_ids:
+            analysis.repositories.set(repo_ids)
+        else:
+            analysis.repositories.add(analysis.repository)
+        return analysis

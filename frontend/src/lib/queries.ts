@@ -226,6 +226,12 @@ export interface AnalysisItem {
   user: string
   project: string
   repository: string
+  repositories: Array<{
+    id: string
+    git_url: string
+    git_branch: string
+    status: string
+  }>
   title: string
   error_context: Record<string, unknown>
   status: string
@@ -275,6 +281,7 @@ export interface AnalysisItem {
 export interface AnalysisInput {
   project: string
   repository: string
+  repository_ids?: string[]
   title: string
   error_context: Record<string, unknown>
 }
