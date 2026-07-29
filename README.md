@@ -4,7 +4,7 @@
 ![Python](https://img.shields.io/badge/python-3.13-blue)
 ![Django](https://img.shields.io/badge/django-5.1-green)
 ![React](https://img.shields.io/badge/react-18-61DAFB)
-![License](https://img.shields.io/badge/license-MIT-yellow)
+![License](https://img.shields.io/badge/license-AGPLv3-blue)
 
 ## What is CodeCoroner?
 
@@ -374,7 +374,15 @@ WebSocket: `ws://localhost:8080/ws/analyses/{id}/` (real-time status)
 
 ## License
 
-MIT
+Copyright (C) 2026 CodeCoroner.
+
+This project is licensed under the **GNU Affero General Public License v3 (AGPL-3.0)** — see the [LICENSE](LICENSE) file for details.
+
+## Contributing
+
+This is a **solo project** and external contributions via pull requests are **not accepted** at this time. The repository is not open for public collaboration — no forks, no PRs, no external code submissions.
+
+If you find a bug or have a suggestion, please open a GitHub issue. All code is pushed exclusively by the project maintainer.
 
 ---
 
