@@ -11,6 +11,7 @@ class Analysis(models.Model):
         RCA = 'rca'
         PATCHING = 'patching'
         VALIDATING = 'validating'
+        FIX_SUGGESTION = 'fix_suggestion'
         COMPLETED = 'completed'
         FAILED = 'failed'
 
@@ -129,6 +130,17 @@ class PatchValidation(models.Model):
     overall_score = models.FloatField(default=0.0)
     output_log = models.TextField(blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
+
+class FixSuggestion(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    analysis = models.OneToOneField(Analysis, on_delete=models.CASCADE, related_name='fix_suggestion')
+    diff = models.TextField(blank=True, default='')
+    plan = models.TextField(blank=True, default='')
+    explanation = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'FixSuggestion for {self.analysis.id.hex[:8]}'
 
 class Report(models.Model):
     class Format(models.TextChoices):

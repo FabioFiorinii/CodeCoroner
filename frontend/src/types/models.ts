@@ -56,13 +56,14 @@ export interface Analysis {
   bug_localization: BugLocalization | null
   root_cause: RootCause | null
   patch: Patch | null
+  fix_suggestion: FixSuggestion | null
   report: ReportData | null
 }
 
 export type AnalysisStatus =
   | 'queued' | 'indexing' | 'analyzing'
   | 'bug_localization' | 'rca'
-  | 'patching' | 'validating'
+  | 'patching' | 'validating' | 'fix_suggestion'
   | 'completed' | 'failed'
 
 export interface ErrorContext {
@@ -125,6 +126,13 @@ export interface PatchValidation {
   type_errors: number
   overall_score: number
   output_log: string
+}
+
+export interface FixSuggestion {
+  diff: string
+  plan: string
+  explanation: string
+  created_at: string
 }
 
 export interface ReportData {

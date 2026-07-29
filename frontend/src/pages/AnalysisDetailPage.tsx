@@ -1,7 +1,7 @@
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, Clock, CheckCircle2, AlertCircle, Loader2,
-  FileCode, Target, FileSearch, BookOpen,
+  FileCode, Target, FileSearch, BookOpen, Wrench,
 } from 'lucide-react'
 import { useAnalysis } from '../lib/queries'
 import { Card } from '../components/common/Card'
@@ -13,6 +13,7 @@ const STATUS_ICON: Record<string, typeof Clock> = {
   analyzing: Loader2,
   bug_localization: Loader2,
   rca: Loader2,
+  fix_suggestion: Loader2,
   completed: CheckCircle2,
   failed: AlertCircle,
 }
@@ -23,6 +24,7 @@ const STATUS_COLOR: Record<string, string> = {
   analyzing: 'text-blue-600 bg-blue-50 border-blue-200',
   bug_localization: 'text-purple-600 bg-purple-50 border-purple-200',
   rca: 'text-purple-600 bg-purple-50 border-purple-200',
+  fix_suggestion: 'text-amber-600 bg-amber-50 border-amber-200',
   completed: 'text-green-600 bg-green-50 border-green-200',
   failed: 'text-red-600 bg-red-50 border-red-200',
 }
@@ -65,7 +67,7 @@ export function AnalysisDetailPage() {
   }
 
   const StatusIcon = STATUS_ICON[analysis.status] || Clock
-  const isBusy = ['queued', 'indexing', 'analyzing', 'bug_localization', 'rca'].includes(analysis.status)
+  const isBusy = ['queued', 'indexing', 'analyzing', 'bug_localization', 'rca', 'fix_suggestion'].includes(analysis.status)
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -103,7 +105,7 @@ export function AnalysisDetailPage() {
           Pipeline Steps
         </h3>
         <div className="space-y-1">
-          {['ensure_repo_indexed', 'analyze_input', 'bug_localization', 'root_cause', 'generate_report', 'completed'].map((step) => {
+          {['ensure_repo_indexed', 'analyze_input', 'bug_localization', 'root_cause', 'generate_report', 'fix_suggestion', 'completed'].map((step) => {
             const run = analysis.runs?.find((r) => r.step === step)
             if (!run && step !== 'completed') return null
             return (
@@ -201,6 +203,42 @@ export function AnalysisDetailPage() {
               {(analysis.root_cause.confidence * 100).toFixed(0)}%
             </span>
           </div>
+        </Card>
+      )}
+
+      {analysis.fix_suggestion && (
+        <Card padding="lg">
+          <h3 className="font-semibold text-text-primary flex items-center gap-2 mb-4">
+            <Wrench className="w-4 h-4" />
+            Fix Suggestion
+          </h3>
+
+          {analysis.fix_suggestion.diff && (
+            <div className="mb-4">
+              <p className="font-medium text-text-primary mb-2 text-sm">Proposed Diff</p>
+              <pre className="text-xs font-mono bg-surface-alt rounded-lg p-4 overflow-x-auto whitespace-pre-wrap leading-relaxed border">
+                {analysis.fix_suggestion.diff}
+              </pre>
+            </div>
+          )}
+
+          {analysis.fix_suggestion.plan && (
+            <div className="mb-4">
+              <p className="font-medium text-text-primary mb-2 text-sm">Fix Plan (AI Prompt)</p>
+              <pre className="text-xs font-mono bg-surface-alt rounded-lg p-4 overflow-x-auto whitespace-pre-wrap leading-relaxed border">
+                {analysis.fix_suggestion.plan}
+              </pre>
+            </div>
+          )}
+
+          {analysis.fix_suggestion.explanation && (
+            <div>
+              <p className="font-medium text-text-primary mb-2 text-sm">Explanation</p>
+              <p className="text-sm text-text-secondary whitespace-pre-wrap leading-relaxed">
+                {analysis.fix_suggestion.explanation}
+              </p>
+            </div>
+          )}
         </Card>
       )}
 

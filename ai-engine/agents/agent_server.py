@@ -12,6 +12,7 @@ from agents.log_analyzer.analyzer import LogAnalyzer
 from agents.bug_localizer.localizer import BugLocalizer
 from agents.root_cause.rca_agent import RootCauseAgent
 from agents.report_generator.generator import ReportGenerator
+from agents.patch_generator.generator import PatchGenerator
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -24,6 +25,7 @@ log_analyzer = LogAnalyzer()
 bug_localizer = BugLocalizer()
 rca_agent = RootCauseAgent()
 report_gen = ReportGenerator()
+patch_gen = PatchGenerator()
 
 
 class EmbedRequest(BaseModel):
@@ -56,6 +58,14 @@ class RootCauseRequest(BaseModel):
 
 class ReportRequest(BaseModel):
     analysis_data: dict
+
+
+class SuggestFixRequest(BaseModel):
+    error_context: dict
+    log_analysis: dict
+    bug_localization: dict | None = None
+    root_cause: dict | None = None
+    chunks: list = []
 
 
 @asynccontextmanager
@@ -157,6 +167,26 @@ async def analyze_root_cause(req: RootCauseRequest):
         raise
     except Exception as exc:
         logger.error('Root cause analysis failed: %s', exc)
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+@app.post('/suggest-fix')
+async def suggest_fix(req: SuggestFixRequest):
+    try:
+        result = await patch_gen.run(
+            error_context=req.error_context,
+            log_analysis=req.log_analysis,
+            bug_localization=req.bug_localization,
+            root_cause=req.root_cause,
+            chunks=req.chunks,
+        )
+        if result.get('status') == 'error':
+            raise HTTPException(status_code=502, detail=result.get('error', 'Fix suggestion failed'))
+        return result
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error('Fix suggestion failed: %s', exc)
         raise HTTPException(status_code=502, detail=str(exc))
 
 

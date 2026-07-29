@@ -41,6 +41,11 @@ export async function getRootCause(id: string) {
   return data
 }
 
+export async function getFixSuggestion(id: string) {
+  const { data } = await apiClient.get(`/analyses/${id}/fix_suggestion/`)
+  return data
+}
+
 export async function getReport(id: string) {
   const { data } = await apiClient.get(`/analyses/${id}/report/`)
   return data

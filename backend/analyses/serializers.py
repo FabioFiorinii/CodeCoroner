@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import (
     Analysis, AnalysisRun, BugLocalization, SuspiciousFileScore,
-    RootCause, Patch, PatchValidation, Report,
+    RootCause, Patch, PatchValidation, Report, FixSuggestion,
 )
 
 class SuspiciousFileScoreSerializer(serializers.ModelSerializer):
@@ -36,6 +36,11 @@ class PatchValidationSerializer(serializers.ModelSerializer):
             'overall_score', 'output_log',
         ]
 
+class FixSuggestionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FixSuggestion
+        fields = ['diff', 'plan', 'explanation', 'created_at']
+
 class ReportSerializer(serializers.ModelSerializer):
     class Meta:
         model = Report
@@ -52,6 +57,7 @@ class AnalysisSerializer(serializers.ModelSerializer):
     bug_localization = BugLocalizationSerializer(read_only=True)
     root_cause = RootCauseSerializer(read_only=True)
     patch = PatchSerializer(read_only=True)
+    fix_suggestion = FixSuggestionSerializer(read_only=True)
     report = ReportSerializer(read_only=True)
 
     class Meta:
@@ -60,12 +66,12 @@ class AnalysisSerializer(serializers.ModelSerializer):
             'id', 'user', 'project', 'repository', 'title', 'error_context',
             'status', 'created_at', 'completed_at', 'duration_seconds',
             'error_message', 'runs', 'bug_localization', 'root_cause',
-            'patch', 'report',
+            'patch', 'fix_suggestion', 'report',
         ]
         read_only_fields = [
             'id', 'user', 'status', 'created_at', 'completed_at',
             'duration_seconds', 'error_message', 'runs',
-            'bug_localization', 'root_cause', 'patch', 'report',
+            'bug_localization', 'root_cause', 'patch', 'fix_suggestion', 'report',
         ]
 
 class AnalysisCreateSerializer(serializers.ModelSerializer):

@@ -5,7 +5,8 @@ from .models import Analysis
 from .serializers import (
     AnalysisSerializer, AnalysisCreateSerializer,
     BugLocalizationSerializer, RootCauseSerializer,
-    PatchSerializer, PatchValidationSerializer, ReportSerializer,
+    PatchSerializer, PatchValidationSerializer,
+    FixSuggestionSerializer, ReportSerializer,
 )
 
 class AnalysisViewSet(viewsets.ModelViewSet):
@@ -24,6 +25,7 @@ class AnalysisViewSet(viewsets.ModelViewSet):
             'bug_localization__suspicious_files',
             'root_cause',
             'patch__validation',
+            'fix_suggestion',
             'report',
         ).distinct()
 
@@ -77,6 +79,14 @@ class AnalysisViewSet(viewsets.ModelViewSet):
         if hasattr(analysis.patch, 'validation'):
             data['validation'] = PatchValidationSerializer(analysis.patch.validation).data
         return Response(data)
+
+    @action(detail=True, methods=['get'])
+    def fix_suggestion(self, request, pk=None):
+        analysis = self.get_object()
+        if not hasattr(analysis, 'fix_suggestion'):
+            return Response({'detail': 'Fix suggestion not available yet.'}, status=status.HTTP_404_NOT_FOUND)
+        serializer = FixSuggestionSerializer(analysis.fix_suggestion)
+        return Response(serializer.data)
 
     @action(detail=True, methods=['get'])
     def report(self, request, pk=None):

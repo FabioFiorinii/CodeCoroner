@@ -8,7 +8,7 @@ from django.conf import settings
 from django.db import transaction
 from pgvector.django import CosineDistance
 
-from .models import Analysis, AnalysisRun, BugLocalization, SuspiciousFileScore, RootCause, Report
+from .models import Analysis, AnalysisRun, BugLocalization, SuspiciousFileScore, RootCause, FixSuggestion, Report
 from repositories.models import ChunkEmbedding, CodeChunk
 
 logger = logging.getLogger(__name__)
@@ -46,6 +46,11 @@ class AnalysisOrchestrator:
             self._record_run('generate_report')
             self._generate_report()
             self._mark_completed('generate_report')
+
+            self._update_status(Analysis.Status.FIX_SUGGESTION)
+            self._record_run('fix_suggestion')
+            self._suggest_fix()
+            self._mark_completed('fix_suggestion')
 
             self._update_status(Analysis.Status.COMPLETED)
             self._record_run('completed', status='completed')
@@ -267,4 +272,46 @@ class AnalysisOrchestrator:
 
         AnalysisRun.objects.filter(
             analysis=self.analysis, step='generate_report'
+        ).update(output=result)
+
+    def _suggest_fix(self):
+        bug_loc = None
+        if hasattr(self.analysis, 'bug_localization'):
+            bl = self.analysis.bug_localization
+            bug_loc = {
+                'summary': bl.summary,
+                'suspicious_files': list(bl.suspicious_files.all().values(
+                    'file_path', 'suspicion_score', 'evidence', 'rank'
+                )),
+            }
+
+        rca = None
+        if hasattr(self.analysis, 'root_cause'):
+            rc = self.analysis.root_cause
+            rca = {
+                'summary': rc.summary,
+                'root_file': rc.root_file,
+                'root_line': rc.root_line,
+                'cause_chain': rc.cause_chain,
+                'confidence': rc.confidence,
+                'reasoning': rc.reasoning,
+            }
+
+        result = self._call_ai('suggest-fix', {
+            'error_context': self.analysis.error_context,
+            'log_analysis': self.log_analysis,
+            'bug_localization': bug_loc,
+            'root_cause': rca,
+            'chunks': getattr(self, 'top_chunks', [])[:5],
+        })
+
+        FixSuggestion.objects.create(
+            analysis=self.analysis,
+            diff=result.get('diff', ''),
+            plan=result.get('plan', ''),
+            explanation=result.get('explanation', ''),
+        )
+
+        AnalysisRun.objects.filter(
+            analysis=self.analysis, step='fix_suggestion'
         ).update(output=result)

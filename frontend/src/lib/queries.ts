@@ -232,6 +232,12 @@ export interface AnalysisItem {
     reasoning: string
     created_at: string
   } | null
+  fix_suggestion: {
+    diff: string
+    plan: string
+    explanation: string
+    created_at: string
+  } | null
   report: {
     markdown: string
     format: string
@@ -260,7 +266,7 @@ export function useAnalysis(id: string | undefined) {
     queryFn: () => api.get(`/analyses/${id}/`),
     enabled: !!id,
     refetchInterval: (query) =>
-      ['queued', 'indexing', 'analyzing', 'bug_localization', 'rca', 'patching'].includes(query.state.data?.status ?? '')
+      ['queued', 'indexing', 'analyzing', 'bug_localization', 'rca', 'patching', 'fix_suggestion'].includes(query.state.data?.status ?? '')
         ? 3000
         : false,
   })
