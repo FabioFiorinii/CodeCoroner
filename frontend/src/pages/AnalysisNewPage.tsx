@@ -3,14 +3,14 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft, Send } from 'lucide-react'
 import { Card } from '../components/common/Card'
 import { Button } from '../components/common/Button'
-import { useProjectRepositories, useCreateAnalysis } from '../lib/queries'
+import { useProjectAssignedRepos, useCreateAnalysis } from '../lib/queries'
 
 export function AnalysisNewPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
-  const { data: reposData } = useProjectRepositories(projectId)
+  const { data: reposData } = useProjectAssignedRepos(projectId)
   const createAnalysis = useCreateAnalysis()
-  const repos = reposData?.results || []
+  const repos = reposData ?? []
 
   const [repoId, setRepoId] = useState('')
   const [title, setTitle] = useState('')

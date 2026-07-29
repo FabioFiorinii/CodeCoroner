@@ -4,6 +4,8 @@ from rest_framework.response import Response
 from django.db.models import Q
 from .models import Project, ProjectMembership
 from .serializers import ProjectSerializer, ProjectMembershipSerializer
+from repositories.models import Repository
+from repositories.serializers import RepositorySerializer
 
 class IsProjectMember(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
@@ -42,3 +44,16 @@ class ProjectViewSet(viewsets.ModelViewSet):
         membership = project.memberships.get(id=member_id)
         membership.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=['get', 'post'], url_path='assign-repos')
+    def assign_repos(self, request, pk=None):
+        project = self.get_object()
+        if request.method == 'GET':
+            repos = project.assigned_repositories.all()
+            serializer = RepositorySerializer(repos, many=True)
+            return Response(serializer.data)
+        elif request.method == 'POST':
+            repo_ids = request.data.get('repository_ids', [])
+            repos = Repository.objects.filter(id__in=repo_ids)
+            project.assigned_repositories.set(repos)
+            return Response({'status': 'ok', 'assigned_count': repos.count()})

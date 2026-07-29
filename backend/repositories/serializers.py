@@ -11,7 +11,7 @@ GIT_URL_PATTERN = re.compile(
 class RepositoryCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Repository
-        fields = ['id', 'project', 'git_url', 'git_branch']
+        fields = ['id', 'git_url', 'git_branch']
         read_only_fields = ['id']
 
     def validate_git_url(self, value):
@@ -19,24 +19,20 @@ class RepositoryCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Invalid git URL format.')
         return value
 
-    def validate_project(self, value):
-        request = self.context.get('request')
-        if request and not value.memberships.filter(user=request.user).exists():
-            raise serializers.ValidationError('You are not a member of this project.')
-        return value
-
 
 class RepositorySerializer(serializers.ModelSerializer):
-    project_name = serializers.CharField(source='project.name', read_only=True)
+    assigned_projects = serializers.SlugRelatedField(
+        many=True, read_only=True, slug_field='id',
+    )
 
     class Meta:
         model = Repository
         fields = [
-            'id', 'project', 'project_name', 'git_url', 'git_branch',
+            'id', 'git_url', 'git_branch',
             'status', 'file_count', 'total_bytes', 'error_message', 'last_indexed_at',
-            'created_at', 'updated_at',
+            'assigned_projects', 'created_at', 'updated_at',
         ]
-        read_only_fields = ['id', 'status', 'file_count', 'total_bytes', 'error_message', 'last_indexed_at', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'status', 'file_count', 'total_bytes', 'error_message', 'last_indexed_at', 'assigned_projects', 'created_at', 'updated_at']
 
 class IndexedFileSerializer(serializers.ModelSerializer):
     class Meta:

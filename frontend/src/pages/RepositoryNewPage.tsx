@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { useCreateRepository } from '../lib/queries'
 import { Button } from '../components/common/Button'
@@ -7,7 +7,6 @@ import { Input } from '../components/common/Input'
 import { Card } from '../components/common/Card'
 
 export function RepositoryNewPage() {
-  const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
   const createRepo = useCreateRepository()
   const [gitUrl, setGitUrl] = useState('')
@@ -29,12 +28,11 @@ export function RepositoryNewPage() {
     e.preventDefault()
     if (!validate()) return
     try {
-      const repo = await createRepo.mutateAsync({
-        project: projectId!,
+      await createRepo.mutateAsync({
         git_url: gitUrl.trim(),
         git_branch: gitBranch.trim(),
       })
-      navigate(`/projects/${projectId}/repos/${repo.id}`, { replace: true })
+      navigate('/repositories', { replace: true })
     } catch {
       // error handled by mutation
     }
@@ -44,11 +42,11 @@ export function RepositoryNewPage() {
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
         <button
-          onClick={() => navigate(`/projects/${projectId}/repos`)}
+          onClick={() => navigate('/repositories')}
           className="flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back
+          Back to Repositories
         </button>
         <h1 className="text-2xl font-bold text-text-primary">Add Repository</h1>
         <p className="text-text-secondary text-sm mt-1">
@@ -82,7 +80,7 @@ export function RepositoryNewPage() {
             <Button
               type="button"
               variant="ghost"
-              onClick={() => navigate(`/projects/${projectId}/repos`)}
+              onClick={() => navigate('/repositories')}
             >
               Cancel
             </Button>

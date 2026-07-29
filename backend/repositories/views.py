@@ -14,7 +14,7 @@ class IsProjectMember(permissions.BasePermission):
 
 
 class RepositoryViewSet(viewsets.ModelViewSet):
-    permission_classes = [permissions.IsAuthenticated, IsProjectMember]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_serializer_class(self):
         if self.action == 'create':
@@ -22,9 +22,7 @@ class RepositoryViewSet(viewsets.ModelViewSet):
         return RepositorySerializer
 
     def get_queryset(self):
-        return Repository.objects.filter(
-            project__memberships__user=self.request.user
-        ).select_related('project').distinct()
+        return Repository.objects.all().distinct()
 
     def perform_create(self, serializer):
         repo = serializer.save()

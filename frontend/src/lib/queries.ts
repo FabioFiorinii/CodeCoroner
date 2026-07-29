@@ -64,8 +64,6 @@ const REPOS_KEY = 'repositories'
 
 export interface RepositoryItem {
   id: string
-  project: string
-  project_name: string
   git_url: string
   git_branch: string
   status: 'pending' | 'cloning' | 'indexing' | 'indexed' | 'error'
@@ -73,12 +71,12 @@ export interface RepositoryItem {
   total_bytes: number
   error_message: string
   last_indexed_at: string | null
+  assigned_projects: string[]
   created_at: string
   updated_at: string
 }
 
 export interface RepositoryInput {
-  project: string
   git_url: string
   git_branch?: string
 }
@@ -114,6 +112,21 @@ export interface CodeChunkItem {
   has_embedding: boolean
 }
 
+export function useRepositories() {
+  return useQuery<{ results: RepositoryItem[] }>({
+    queryKey: [REPOS_KEY],
+    queryFn: () => api.get('/repositories/'),
+  })
+}
+
+export function useProjectAssignedRepos(projectId: string | undefined) {
+  return useQuery<RepositoryItem[]>({
+    queryKey: [REPOS_KEY, 'assigned', projectId],
+    queryFn: () => api.get(`/projects/${projectId}/assign-repos/`),
+    enabled: !!projectId,
+  })
+}
+
 export function useProjectRepositories(projectId: string | undefined) {
   return useQuery<{ results: RepositoryItem[] }>({
     queryKey: [REPOS_KEY, { project: projectId }],
@@ -136,11 +149,20 @@ export function useCreateRepository() {
   const qc = useQueryClient()
   return useMutation<RepositoryItem, Error, RepositoryInput>({
     mutationFn: (data) => api.post<RepositoryItem>('/repositories/', data),
-    onSuccess: (data) => {
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: [REPOS_KEY] })
-      if (data?.project) {
-        qc.invalidateQueries({ queryKey: [PROJECTS_KEY, data.project] })
-      }
+    },
+  })
+}
+
+export function useAssignProjectRepos(projectId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (repository_ids: string[]) =>
+      api.post(`/projects/${projectId}/assign-repos/`, { repository_ids }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [REPOS_KEY, 'assigned', projectId] })
+      qc.invalidateQueries({ queryKey: [PROJECTS_KEY, projectId] })
     },
   })
 }

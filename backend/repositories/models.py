@@ -15,6 +15,13 @@ class Repository(models.Model):
         'projects.Project',
         on_delete=models.CASCADE,
         related_name='repositories',
+        null=True,
+        blank=True,
+    )
+    assigned_projects = models.ManyToManyField(
+        'projects.Project',
+        related_name='assigned_repositories',
+        blank=True,
     )
     git_url = models.CharField(max_length=2048)
     git_branch = models.CharField(max_length=255, default='main')

@@ -27,7 +27,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         return obj.memberships.count()
 
     def get_repo_count(self, obj):
-        return obj.repositories.count()
+        return obj.assigned_repositories.count()
 
     def create(self, validated_data):
         request = self.context.get('request')

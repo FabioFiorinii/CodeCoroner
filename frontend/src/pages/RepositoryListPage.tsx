@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Link, useParams, useNavigate } from 'react-router-dom'
-import { Plus, Search, GitBranch, Globe, FileCode, ArrowLeft, FolderOpen } from 'lucide-react'
-import { useProject, useProjectRepositories } from '../lib/queries'
+import { useNavigate } from 'react-router-dom'
+import { Plus, Search, GitBranch, Globe, FileCode } from 'lucide-react'
+import { useRepositories } from '../lib/queries'
 import { Card } from '../components/common/Card'
 import { Button } from '../components/common/Button'
 
@@ -14,10 +14,8 @@ const STATUS_BADGE: Record<string, string> = {
 }
 
 export function RepositoryListPage() {
-  const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
-  const { data, isLoading, error } = useProjectRepositories(projectId)
-  const { data: project } = useProject(projectId)
+  const { data, isLoading, error } = useRepositories()
   const [search, setSearch] = useState('')
 
   const repos = data?.results?.filter(
@@ -26,34 +24,17 @@ export function RepositoryListPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <button
-          onClick={() => navigate(`/projects/${projectId}`)}
-          className="flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors mb-4"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Project
-        </button>
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2 text-sm text-text-secondary mb-1">
-              <FolderOpen className="w-4 h-4" />
-              <span>{project?.name ?? 'Project'}</span>
-            </div>
-            <h1 className="text-[clamp(2.5rem,5vw,4rem)] font-bold text-text-primary leading-tight">
-              Repositories
-            </h1>
-            <p className="text-text-secondary mt-1">
-              {data?.results?.length ?? 0} total
-            </p>
-          </div>
-          <Link to={`/projects/${projectId}/repos/new`}>
-            <Button>
-              <Plus className="w-4 h-4" />
-              Add Repository
-            </Button>
-          </Link>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-text-primary">Repositories</h1>
+          <p className="text-text-secondary mt-1">
+            {data?.results?.length ?? 0} total repositories
+          </p>
         </div>
+        <Button onClick={() => navigate('/repositories/new')}>
+          <Plus className="w-4 h-4" />
+          Add Repository
+        </Button>
       </div>
 
       <div className="relative max-w-md">
@@ -88,30 +69,22 @@ export function RepositoryListPage() {
       )}
 
       {repos?.length === 0 && !isLoading && (
-        <Card padding="lg" className="empty-state">
-          <GitBranch className="w-12 h-12 text-text-muted" />
-          <div>
-            <p className="font-medium text-text-primary">No repositories yet</p>
-            <p className="text-sm text-text-muted mt-1">
-              Add a Git repository to start indexing code.
-            </p>
-          </div>
-          <Link to={`/projects/${projectId}/repos/new`}>
-            <Button variant="secondary" className="mt-2">
-              <Plus className="w-4 h-4" />
-              Add Repository
-            </Button>
-          </Link>
+        <Card padding="lg" className="text-center">
+          <GitBranch className="w-12 h-12 text-text-muted mx-auto mb-3" />
+          <p className="font-medium text-text-primary">No repositories yet</p>
+          <p className="text-sm text-text-muted mt-1 mb-4">
+            Add a Git repository to start indexing code for analysis.
+          </p>
+          <Button onClick={() => navigate('/repositories/new')}>
+            <Plus className="w-4 h-4" />
+            Add Repository
+          </Button>
         </Card>
       )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {repos?.map((repo) => (
-          <Link
-            key={repo.id}
-            to={`/projects/${projectId}/repos/${repo.id}`}
-            className="block group"
-          >
+          <div key={repo.id} className="block group">
             <Card hover padding="md" className="h-full">
               <div className="flex items-start justify-between mb-3">
                 <Globe className="w-5 h-5 text-primary mt-0.5" />
@@ -121,7 +94,7 @@ export function RepositoryListPage() {
                   {repo.status}
                 </span>
               </div>
-              <h3 className="font-semibold text-text-primary group-hover:text-primary transition-colors text-sm truncate">
+              <h3 className="font-semibold text-text-primary text-sm truncate">
                 {repo.git_url}
               </h3>
               <p className="text-sm text-text-secondary mt-1 flex items-center gap-1">
@@ -141,8 +114,11 @@ export function RepositoryListPage() {
                   {repo.error_message}
                 </p>
               )}
+              <div className="mt-3 text-xs text-text-muted">
+                Assigned to {repo.assigned_projects?.length ?? 0} project(s)
+              </div>
             </Card>
-          </Link>
+          </div>
         ))}
       </div>
     </div>
