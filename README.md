@@ -57,7 +57,7 @@ Unlike a simple RAG chatbot, CodeCoroner runs a **multi-agent pipeline** with sp
 | `postgres` | pgvector/pgvector:pg16 | Database + vector storage |
 | `redis` | redis:7-alpine | Cache, Celery broker, WebSocket |
 | `minio` | minio/minio | S3-compatible artifact storage |
-| `ollama` | ollama/ollama | Local LLM (DeepSeek-Coder, Mistral, Nomic-Embed) |
+| `ollama` | ollama/ollama | Local LLM (Qwen2.5-Coder, Nomic-Embed) |
 | `django` | custom | REST API, admin, ORM |
 | `daphne` | custom | ASGI WebSocket server |
 | `celery_worker` | custom | Async task execution |
@@ -87,8 +87,8 @@ Unlike a simple RAG chatbot, CodeCoroner runs a **multi-agent pipeline** with sp
 ### AI
 - **Ollama** (local LLM execution)
 - **nomic-embed-text** (768-dim code embeddings)
-- **deepseek-coder:1.3b** (RCA, fix suggestion)
-- **deepseek-coder:6.7b/14b** (RCA, fix suggestion — for production)
+- **qwen2.5-coder:1.5b** (default — analysis pipeline; auto-downloaded on startup)
+- **qwen2.5-coder:3b / 7b** (balanced / precise tiers, selectable in Admin Settings)
 
 ### Infrastructure
 - **Podman** (daemonless container runtime)

@@ -114,6 +114,16 @@ async def lifespan(app: FastAPI):
     logger.info('AgentServer starting...')
     health = await ollama.health()
     logger.info('Ollama health: %s', health)
+    if health:
+        for model in dict.fromkeys([settings.llm_model, settings.rca_model]):
+            if model not in await installed_models():
+                logger.info('Downloading default model %s ...', model)
+                try:
+                    await ollama.pull(model)
+                    _installed_cache = None
+                    logger.info('Default model %s downloaded', model)
+                except Exception as exc:
+                    logger.error('Failed to download default model %s: %s', model, exc)
     yield
     await ollama.close()
     await embedder.close()

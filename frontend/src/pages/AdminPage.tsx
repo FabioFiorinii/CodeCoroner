@@ -184,6 +184,69 @@ export function AdminPage() {
         </div>
       </div>
 
+      <Card padding="lg">
+        <h2 className="text-lg font-semibold text-text-primary flex items-center gap-2">
+          <Sparkles className="w-5 h-5" />
+          AI Models
+        </h2>
+
+        <input
+          type="range"
+          min={0}
+          max={2}
+          step={1}
+          value={tierIndex}
+          disabled={savingModels || !modelSettings}
+          onChange={(e) => {
+            setTierIndex(Number(e.target.value))
+            setSaveModelSuccess(null)
+          }}
+          className="w-full accent-primary mt-4"
+        />
+        <div className="flex justify-between text-sm mt-1">
+          {modelSettings?.available.map((opt, i) => (
+            <span
+              key={opt.key}
+              className={i === tierIndex ? 'text-primary font-medium' : 'text-text-muted'}
+            >
+              {opt.label}
+            </span>
+          ))}
+        </div>
+
+        {selectedTier && (
+          <div className="mt-4 p-3 rounded-lg bg-surface-alt">
+            <p className="text-sm font-medium text-text-primary">{selectedTier.model}</p>
+            <p className="text-xs text-text-muted">{selectedTier.params} parameters</p>
+            {!selectedTier.installed && (
+              <p className="text-xs text-amber-500 mt-1">
+                Not installed yet — it will be downloaded when you save.
+              </p>
+            )}
+          </div>
+        )}
+
+        <div className="mt-4">
+          <Button onClick={handleSaveModelSettings} disabled={savingModels || !modelSettings}>
+            {savingModels ? (
+              'Downloading model...'
+            ) : (
+              <>
+                <Download className="w-4 h-4" />
+                Save & Install
+              </>
+            )}
+          </Button>
+        </div>
+
+        {saveModelSuccess && (
+          <p className="text-sm text-green-500 mt-3">{saveModelSuccess}</p>
+        )}
+        {saveModelError && (
+          <p className="text-sm text-red-500 mt-3">{saveModelError}</p>
+        )}
+      </Card>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between">
@@ -268,74 +331,7 @@ export function AdminPage() {
               )}
             </div>
           )}
-
-        <Card padding="lg">
-          <h2 className="text-lg font-semibold text-text-primary flex items-center gap-2">
-            <Sparkles className="w-5 h-5" />
-            AI Models
-          </h2>
-          <p className="text-sm text-text-secondary mt-1 mb-4">
-            Quality vs speed for the analysis pipeline. The selected model is downloaded and
-            verified automatically when you save; if anything fails, the previous model stays active.
-          </p>
-
-          <input
-            type="range"
-            min={0}
-            max={2}
-            step={1}
-            value={tierIndex}
-            disabled={savingModels || !modelSettings}
-            onChange={(e) => {
-              setTierIndex(Number(e.target.value))
-              setSaveModelSuccess(null)
-            }}
-            className="w-full accent-primary"
-          />
-          <div className="flex justify-between text-sm mt-1">
-            {modelSettings?.available.map((opt, i) => (
-              <span
-                key={opt.key}
-                className={i === tierIndex ? 'text-primary font-medium' : 'text-text-muted'}
-              >
-                {opt.label}
-              </span>
-            ))}
-          </div>
-
-          {selectedTier && (
-            <div className="mt-4 p-3 rounded-lg bg-surface-alt">
-              <p className="text-sm font-medium text-text-primary">{selectedTier.model}</p>
-              <p className="text-xs text-text-muted">{selectedTier.params} parameters</p>
-              {!selectedTier.installed && (
-                <p className="text-xs text-amber-500 mt-1">
-                  Not installed yet — it will be downloaded when you save.
-                </p>
-              )}
-            </div>
-          )}
-
-          <div className="mt-4">
-            <Button onClick={handleSaveModelSettings} disabled={savingModels || !modelSettings}>
-              {savingModels ? (
-                'Downloading model...'
-              ) : (
-                <>
-                  <Download className="w-4 h-4" />
-                  Save & Install
-                </>
-              )}
-            </Button>
-          </div>
-
-          {saveModelSuccess && (
-            <p className="text-sm text-green-500 mt-3">{saveModelSuccess}</p>
-          )}
-          {saveModelError && (
-            <p className="text-sm text-red-500 mt-3">{saveModelError}</p>
-          )}
-        </Card>
-      </div>
+        </div>
 
         <div className="space-y-4">
           <div className="flex items-center justify-between">
