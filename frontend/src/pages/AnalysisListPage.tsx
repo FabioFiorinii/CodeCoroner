@@ -1,30 +1,11 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Plus, Bug, ArrowLeft, Clock, CheckCircle2, AlertCircle, Loader2, Trash2 } from 'lucide-react'
+import { Plus, Bug, ArrowLeft, Clock, Trash2 } from 'lucide-react'
 import { useAnalyses, useDeleteAnalysis } from '../lib/queries'
+import { STATUS_ICON, STATUS_COLOR, isBusy } from '../lib/analysisStatus'
 import { Card } from '../components/common/Card'
 import { Button } from '../components/common/Button'
 import { useAuthStore } from '../stores/authStore'
-
-const STATUS_ICON: Record<string, typeof Clock> = {
-  queued: Clock,
-  indexing: Loader2,
-  analyzing: Loader2,
-  bug_localization: Loader2,
-  rca: Loader2,
-  completed: CheckCircle2,
-  failed: AlertCircle,
-}
-
-const STATUS_COLOR: Record<string, string> = {
-  queued: 'text-yellow-600 bg-yellow-50 border-yellow-200',
-  indexing: 'text-blue-600 bg-blue-50 border-blue-200',
-  analyzing: 'text-blue-600 bg-blue-50 border-blue-200',
-  bug_localization: 'text-purple-600 bg-purple-50 border-purple-200',
-  rca: 'text-purple-600 bg-purple-50 border-purple-200',
-  completed: 'text-green-600 bg-green-50 border-green-200',
-  failed: 'text-red-600 bg-red-50 border-red-200',
-}
 
 export function AnalysisListPage() {
   const { projectId } = useParams<{ projectId: string }>()
@@ -36,8 +17,6 @@ export function AnalysisListPage() {
   const analyses = data?.results?.filter(
     (a) => a.title.toLowerCase().includes(search.toLowerCase()),
   )
-
-  const isBusy = (s: string) => ['queued', 'indexing', 'analyzing', 'bug_localization', 'rca'].includes(s)
 
   return (
     <div className="space-y-6">

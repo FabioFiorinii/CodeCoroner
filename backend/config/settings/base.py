@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     'reports',
     'webhooks',
     'common',
+    'dashboard',
 ]
 
 MIDDLEWARE = [

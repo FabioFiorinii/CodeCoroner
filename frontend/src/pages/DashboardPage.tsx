@@ -1,18 +1,20 @@
 import { useNavigate, Link } from 'react-router-dom'
-import { useProjects, useRepositories } from '../lib/queries'
+import { useProjects, useRepositories, useDashboard } from '../lib/queries'
+import { STATUS_ICON, STATUS_COLOR, isBusy } from '../lib/analysisStatus'
 import { Card } from '../components/common/Card'
 import { Button } from '../components/common/Button'
 import { useAuthStore } from '../stores/authStore'
-import { Plus, FolderOpen, GitBranch, Bug, ArrowRight } from 'lucide-react'
+import { Plus, FolderOpen, GitBranch, Users, Bug, Clock } from 'lucide-react'
 
 export function DashboardPage() {
   const { user } = useAuthStore()
-  const { data: projectsData, isLoading: projectsLoading } = useProjects()
+  const { data: projectsData } = useProjects()
   const { data: reposData } = useRepositories()
+  const { data: dashboard } = useDashboard()
   const navigate = useNavigate()
 
   const projects = projectsData?.results ?? []
-  const recentProjects = projects.slice(0, 5)
+  const recentAnalyses = dashboard?.recent_analyses ?? []
 
   return (
     <div className="space-y-8">
@@ -31,7 +33,7 @@ export function DashboardPage() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card padding="lg">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -61,13 +63,27 @@ export function DashboardPage() {
         <Card padding="lg">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
-              <Bug className="w-5 h-5 text-purple-500" />
+              <Users className="w-5 h-5 text-purple-500" />
             </div>
             <div>
               <p className="text-2xl font-bold text-text-primary">
-                {projects.reduce((sum, p) => sum + (p.member_count ?? 0), 0)}
+                {dashboard?.team_member_count ?? 0}
               </p>
               <p className="text-sm text-text-muted">Team Members</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card padding="lg">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+              <Bug className="w-5 h-5 text-emerald-500" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-text-primary">
+                {dashboard?.analyses_count ?? 0}
+              </p>
+              <p className="text-sm text-text-muted">Analyses</p>
             </div>
           </div>
         </Card>
@@ -75,53 +91,60 @@ export function DashboardPage() {
 
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-text-primary">Recent Projects</h2>
-          {projects.length > 0 && (
-            <Link to="/projects" className="text-sm text-primary hover:underline flex items-center gap-1">
-              View all <ArrowRight className="w-3 h-3" />
-            </Link>
-          )}
+          <h2 className="text-lg font-semibold text-text-primary">Recent Analysis</h2>
         </div>
 
-        {projectsLoading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-16 bg-surface-alt rounded-lg animate-pulse" />
-            ))}
-          </div>
-        ) : recentProjects.length === 0 ? (
+        {recentAnalyses.length === 0 ? (
           <Card padding="lg" className="text-center">
-            <p className="text-text-muted mb-4">No projects yet. Create your first project to get started.</p>
-            <Button onClick={() => navigate('/projects/new')}>
-              <Plus className="w-4 h-4" />
-              Create Project
-            </Button>
+            <Bug className="w-12 h-12 text-text-muted mx-auto mb-3" />
+            <p className="font-medium text-text-primary">No analyses yet</p>
+            <p className="text-sm text-text-muted mt-1 mb-4">
+              Analyses from your team will show up here.
+            </p>
+            <Link to="/projects">
+              <Button variant="secondary">
+                <Plus className="w-4 h-4" />
+                Start Analysis
+              </Button>
+            </Link>
           </Card>
         ) : (
-          <div className="space-y-2">
-            {recentProjects.map((p) => (
-              <Link key={p.id} to={`/projects/${p.id}`} className="block group">
-                <Card hover padding="md">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-medium text-text-primary group-hover:text-primary transition-colors">
-                        {p.name}
-                      </h3>
-                      {p.description && (
-                        <p className="text-sm text-text-muted mt-0.5 line-clamp-1">{p.description}</p>
-                      )}
+          <div className="space-y-3">
+            {recentAnalyses.map((a) => {
+              const StatusIcon = STATUS_ICON[a.status] || Clock
+              return (
+                <Link
+                  key={a.id}
+                  to={`/projects/${a.project_id}/analyses/${a.id}`}
+                  className="block group"
+                >
+                  <Card hover padding="md">
+                    <div className="flex items-center justify-between">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-semibold text-text-primary group-hover:text-primary transition-colors truncate">
+                          {a.title || 'Untitled Analysis'}
+                        </h3>
+                        <p className="text-sm text-text-secondary mt-0.5">
+                          {new Date(a.created_at).toLocaleString()}
+                          {a.duration_seconds ? ` · ${a.duration_seconds}s` : ''}
+                        </p>
+                        <p className="text-xs text-text-muted mt-0.5 flex items-center gap-1">
+                          <FolderOpen className="w-3 h-3" />
+                          {a.project_name}
+                        </p>
+                      </div>
+                      <div className={`flex items-center gap-1.5 text-sm px-3 py-1 rounded-full border ${STATUS_COLOR[a.status] || 'border-gray-200'}`}>
+                        <StatusIcon className={`w-4 h-4 ${isBusy(a.status) ? 'animate-spin' : ''}`} />
+                        <span className="capitalize">{a.status}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3 text-sm text-text-muted shrink-0">
-                      <span className="flex items-center gap-1">
-                        <GitBranch className="w-3.5 h-3.5" />
-                        {p.repo_count}
-                      </span>
-                      <ArrowRight className="w-4 h-4 group-hover:text-primary transition-colors" />
-                    </div>
-                  </div>
-                </Card>
-              </Link>
-            ))}
+                    {a.error_message && (
+                      <p className="text-sm text-red-500 mt-2">{a.error_message}</p>
+                    )}
+                  </Card>
+                </Link>
+              )
+            })}
           </div>
         )}
       </div>

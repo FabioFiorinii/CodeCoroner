@@ -10,6 +10,7 @@ api_v1_patterns = [
     path('analyses/', include('analyses.urls')),
     path('reports/', include('reports.urls')),
     path('webhooks/', include('webhooks.urls')),
+    path('dashboard/', include('dashboard.urls')),
 ]
 
 urlpatterns = [

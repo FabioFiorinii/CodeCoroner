@@ -129,10 +129,6 @@ export function ProjectDetailPage() {
         </Card>
       </Link>
 
-      <Card padding="lg">
-        <h3 className="font-semibold text-text-primary mb-4">Members</h3>
-        <p className="text-sm text-text-muted">Member list coming soon.</p>
-      </Card>
     </div>
   )
 }

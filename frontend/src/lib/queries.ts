@@ -323,3 +323,29 @@ export function useDeleteAnalysis() {
     onSuccess: () => qc.invalidateQueries({ queryKey: [ANALYSES_KEY] }),
   })
 }
+
+/* ───── Dashboard ───── */
+
+export interface RecentAnalysisItem {
+  id: string
+  title: string
+  status: string
+  created_at: string
+  duration_seconds: number | null
+  error_message: string
+  project_id: string
+  project_name: string
+}
+
+export interface DashboardStats {
+  team_member_count: number
+  analyses_count: number
+  recent_analyses: RecentAnalysisItem[]
+}
+
+export function useDashboard() {
+  return useQuery<DashboardStats>({
+    queryKey: ['dashboard'],
+    queryFn: () => api.get('/dashboard/'),
+  })
+}
