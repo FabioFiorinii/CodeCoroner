@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 
 class OllamaClient:
     def __init__(self, base_url: str = 'http://ollama:11434'):
-        self.client = httpx.AsyncClient(base_url=base_url, timeout=120.0)
+        self.client = httpx.AsyncClient(base_url=base_url, timeout=600.0)
 
     async def generate(self, model: str, prompt: str, **kwargs) -> str:
         response = await self.client.post('/api/generate', json={

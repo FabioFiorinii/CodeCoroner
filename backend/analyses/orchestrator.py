@@ -146,7 +146,7 @@ class AnalysisOrchestrator:
             from repositories.tasks import index_repository_task
             index_repository_task(str(repo.id))
 
-    def _call_ai(self, endpoint: str, payload: dict, timeout: int = 300) -> dict:
+    def _call_ai(self, endpoint: str, payload: dict, timeout: int = 600) -> dict:
         resp = httpx.post(f'{AI_URL}/{endpoint}', json=payload, timeout=timeout)
         resp.raise_for_status()
         return resp.json()

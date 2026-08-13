@@ -34,7 +34,7 @@ class PatchGenerator(BaseAgent):
         source_code = json.dumps([
             {
                 'file_path': c.get('file_path', ''),
-                'content': c.get('content', '')[:3000],
+                'content': c.get('content', '')[:1500],
                 'start_line': c.get('start_line', 0),
                 'end_line': c.get('end_line', 0),
             }
