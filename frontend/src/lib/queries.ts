@@ -223,6 +223,8 @@ const ANALYSES_KEY = 'analyses'
 
 export interface AnalysisItem {
   id: string
+  parent_analysis: string | null
+  children_count: number
   user: string
   user_email: string
   user_username: string
@@ -286,6 +288,7 @@ export interface AnalysisInput {
   repository_ids?: string[]
   title: string
   error_context: Record<string, unknown>
+  parent_analysis?: string
 }
 
 export function useAnalyses(projectId: string | undefined) {
@@ -320,6 +323,22 @@ export function useDeleteAnalysis() {
   const qc = useQueryClient()
   return useMutation<void, Error, string>({
     mutationFn: (id) => api.delete(`/analyses/${id}/`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [ANALYSES_KEY] }),
+  })
+}
+
+export function useAnalysisThread(id: string | undefined) {
+  return useQuery<AnalysisItem[]>({
+    queryKey: [ANALYSES_KEY, 'thread', id],
+    queryFn: () => api.get(`/analyses/${id}/thread/`),
+    enabled: !!id,
+  })
+}
+
+export function useDeleteAnalysisThread() {
+  const qc = useQueryClient()
+  return useMutation<void, Error, string>({
+    mutationFn: (id) => api.delete(`/analyses/${id}/thread/`),
     onSuccess: () => qc.invalidateQueries({ queryKey: [ANALYSES_KEY] }),
   })
 }

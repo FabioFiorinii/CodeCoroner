@@ -1,10 +1,15 @@
+import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, Clock, CheckCircle2, AlertCircle, Loader2,
   FileCode, Target, FileSearch, BookOpen, Wrench, GitBranch, Globe,
-  FileText, Trash2,
+  FileText, Trash2, Plus, X, ChevronLeft, ChevronRight,
 } from 'lucide-react'
-import { useAnalysis, useDeleteAnalysis } from '../lib/queries'
+import {
+  useAnalysis, useDeleteAnalysis, useAnalysisThread, useDeleteAnalysisThread,
+  useCreateAnalysis, useProjectAssignedRepos,
+} from '../lib/queries'
+import { AnalysisForm } from '../components/AnalysisForm'
 import { useAuthStore } from '../stores/authStore'
 import { Card } from '../components/common/Card'
 import { Button } from '../components/common/Button'
@@ -42,7 +47,15 @@ export function AnalysisDetailPage() {
   const navigate = useNavigate()
   const { data: analysis, isLoading, error } = useAnalysis(id)
   const deleteAnalysis = useDeleteAnalysis()
+  const deleteThread = useDeleteAnalysisThread()
+  const createAnalysis = useCreateAnalysis()
   const { user } = useAuthStore()
+  const [showRetryModal, setShowRetryModal] = useState(false)
+  const [retryError, setRetryError] = useState<string | null>(null)
+
+  const rootId = analysis?.parent_analysis ?? analysis?.id
+  const { data: thread } = useAnalysisThread(rootId)
+  const { data: projectRepos } = useProjectAssignedRepos(projectId)
 
   if (isLoading) {
     return (
@@ -73,6 +86,20 @@ export function AnalysisDetailPage() {
   const StatusIcon = STATUS_ICON[analysis.status] || Clock
   const isBusy = ['queued', 'indexing', 'analyzing', 'bug_localization', 'rca', 'fix_suggestion'].includes(analysis.status)
 
+  const threadPos = thread?.findIndex((t) => t.id === analysis.id) ?? -1
+  const retryRepos = analysis.repositories?.length
+    ? analysis.repositories.map((r) => ({ id: r.id, git_url: r.git_url, git_branch: r.git_branch }))
+    : (projectRepos ?? [])
+  const retryInitial = {
+    title: analysis.title,
+    errorContext: analysis.error_context ?? {},
+    repoIds: analysis.repositories?.map((r) => r.id) ?? [],
+  }
+
+  const goToAnalysis = (navigateToId: string | undefined) => {
+    if (navigateToId) navigate(`/projects/${projectId}/analyses/${navigateToId}`)
+  }
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div>
@@ -84,8 +111,19 @@ export function AnalysisDetailPage() {
           Analyses
         </Link>
         <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-text-primary">{analysis.title || 'Untitled Analysis'}</h1>
+          <div className="min-w-0">
+            {analysis.parent_analysis && thread && (
+              <p className="text-xs text-text-muted mb-1">
+                Retry {threadPos + 1} of {thread.length} —{' '}
+                <Link
+                  to={`/projects/${projectId}/analyses/${thread[0].id}`}
+                  className="text-primary hover:underline"
+                >
+                  {thread[0].title || 'Untitled Analysis'}
+                </Link>
+              </p>
+            )}
+            <h1 className="text-2xl font-bold text-text-primary truncate">{analysis.title || 'Untitled Analysis'}</h1>
             <p className="text-text-secondary mt-1">
               {new Date(analysis.created_at).toLocaleString()}
               {analysis.duration_seconds ? ` · ${formatDuration(analysis.duration_seconds)}` : ''}
@@ -94,24 +132,97 @@ export function AnalysisDetailPage() {
               by {analysis.user_email || analysis.user_username || analysis.user}
             </p>
           </div>
-          {user?.is_superuser && (
+          <div className="flex items-center gap-2 shrink-0">
             <Button
-              variant="ghost"
+              variant="secondary"
               size="sm"
-              className="text-red-500 hover:text-red-600 hover:bg-red-50 shrink-0"
               onClick={() => {
-                if (confirm('Delete this analysis? This cannot be undone.')) {
-                  deleteAnalysis.mutate(analysis.id, {
-                    onSuccess: () => navigate(`/projects/${projectId}/analyses`),
-                  })
-                }
+                setRetryError(null)
+                setShowRetryModal(true)
               }}
             >
-              <Trash2 className="w-4 h-4" />
-              Delete
+              <Plus className="w-4 h-4" />
+              + Analysis
             </Button>
-          )}
+            {user?.is_superuser && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-red-500 hover:text-red-600 hover:bg-red-50 shrink-0"
+                  onClick={() => {
+                    if (confirm('Delete this analysis? This cannot be undone.')) {
+                      deleteAnalysis.mutate(analysis.id, {
+                        onSuccess: () => navigate(`/projects/${projectId}/analyses`),
+                      })
+                    }
+                  }}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50 shrink-0"
+                  onClick={() => {
+                    if (confirm('Delete this bug thread and all its analyses? This cannot be undone.')) {
+                      deleteThread.mutate(rootId!, {
+                        onSuccess: () => navigate(`/projects/${projectId}/analyses`),
+                      })
+                    }
+                  }}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete All
+                </Button>
+              </>
+            )}
+          </div>
         </div>
+
+        {thread && thread.length > 1 && (
+          <div className="flex items-center gap-2 mt-4">
+            <button
+              onClick={() => goToAnalysis(thread[threadPos - 1]?.id)}
+              disabled={threadPos <= 0}
+              className="p-2 rounded-lg border border-border hover:border-primary/50 transition-colors disabled:opacity-40"
+              aria-label="Previous analysis"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <div className="flex items-center gap-1.5">
+              {thread.map((t, i) => {
+                const active = t.id === analysis.id
+                return (
+                  <Link
+                    key={t.id}
+                    to={`/projects/${projectId}/analyses/${t.id}`}
+                    title={t.title || `Attempt ${i + 1}`}
+                    className={`w-8 h-8 flex items-center justify-center text-sm rounded-full border transition-all ${
+                      active
+                        ? 'bg-primary text-white border-primary font-medium'
+                        : 'border-border text-text-secondary hover:border-primary/50'
+                    }`}
+                  >
+                    {i + 1}
+                  </Link>
+                )
+              })}
+            </div>
+            <button
+              onClick={() => goToAnalysis(thread[threadPos + 1]?.id)}
+              disabled={threadPos >= thread.length - 1}
+              className="p-2 rounded-lg border border-border hover:border-primary/50 transition-colors disabled:opacity-40"
+              aria-label="Next analysis"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+            <span className="text-xs text-text-muted ml-1">
+              Attempt {threadPos + 1} of {thread.length}
+            </span>
+          </div>
+        )}
       </div>
 
       {analysis.repositories && analysis.repositories.length > 0 && (
@@ -347,6 +458,48 @@ export function AnalysisDetailPage() {
         <Card padding="lg" className="text-center text-text-muted">
           Analysis complete but no report was generated.
         </Card>
+      )}
+
+      {showRetryModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <Card padding="lg">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-text-primary">New Analysis — integrate info</h3>
+                <button
+                  onClick={() => setShowRetryModal(false)}
+                  className="p-1 text-text-muted hover:text-text-primary"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <AnalysisForm
+                projectId={projectId!}
+                availableRepos={retryRepos}
+                initial={retryInitial}
+                submitLabel="Run Again"
+                loading={createAnalysis.isPending}
+                note="Re-running the full pipeline takes a few minutes and uses compute — add any new information you have and click Run Again."
+                onSubmit={async (input) => {
+                  setRetryError(null)
+                  try {
+                    const result = await createAnalysis.mutateAsync({
+                      ...input,
+                      parent_analysis: rootId,
+                    })
+                    setShowRetryModal(false)
+                    navigate(`/projects/${projectId}/analyses/${result.id}`)
+                  } catch (err) {
+                    setRetryError(
+                      err instanceof Error ? err.message : 'Failed to start the analysis.',
+                    )
+                  }
+                }}
+              />
+              {retryError && <p className="text-sm text-red-500 mt-3">{retryError}</p>}
+            </Card>
+          </div>
+        </div>
       )}
     </div>
   )

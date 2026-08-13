@@ -1,6 +1,8 @@
 import uuid
-from django.db import models
+
 from django.conf import settings
+from django.db import models
+
 
 class Analysis(models.Model):
     class Status(models.TextChoices):
@@ -16,6 +18,13 @@ class Analysis(models.Model):
         FAILED = 'failed'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    parent_analysis = models.ForeignKey(
+        'self',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='children',
+    )
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -55,6 +64,7 @@ class Analysis(models.Model):
     def __str__(self):
         return self.title or self.id.hex[:8]
 
+
 class AnalysisRun(models.Model):
     class Status(models.TextChoices):
         RUNNING = 'running'
@@ -75,11 +85,15 @@ class AnalysisRun(models.Model):
     def __str__(self):
         return f'{self.analysis.id.hex[:8]} - {self.step} ({self.status})'
 
+
 class BugLocalization(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    analysis = models.OneToOneField(Analysis, on_delete=models.CASCADE, related_name='bug_localization')
+    analysis = models.OneToOneField(
+        Analysis, on_delete=models.CASCADE, related_name='bug_localization'
+    )
     summary = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
+
 
 class SuspiciousFileScore(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -97,6 +111,7 @@ class SuspiciousFileScore(models.Model):
     class Meta:
         ordering = ['rank']
 
+
 class RootCause(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     analysis = models.OneToOneField(Analysis, on_delete=models.CASCADE, related_name='root_cause')
@@ -107,6 +122,7 @@ class RootCause(models.Model):
     confidence = models.FloatField(default=0.0)
     reasoning = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
+
 
 class Patch(models.Model):
     class Status(models.TextChoices):
@@ -123,6 +139,7 @@ class Patch(models.Model):
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     created_at = models.DateTimeField(auto_now_add=True)
 
+
 class PatchValidation(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     patch = models.OneToOneField(Patch, on_delete=models.CASCADE, related_name='validation')
@@ -136,9 +153,12 @@ class PatchValidation(models.Model):
     output_log = models.TextField(blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
 
+
 class FixSuggestion(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    analysis = models.OneToOneField(Analysis, on_delete=models.CASCADE, related_name='fix_suggestion')
+    analysis = models.OneToOneField(
+        Analysis, on_delete=models.CASCADE, related_name='fix_suggestion'
+    )
     diff = models.TextField(blank=True, default='')
     plan = models.TextField(blank=True, default='')
     explanation = models.TextField(blank=True, default='')
@@ -146,6 +166,7 @@ class FixSuggestion(models.Model):
 
     def __str__(self):
         return f'FixSuggestion for {self.analysis.id.hex[:8]}'
+
 
 class Report(models.Model):
     class Format(models.TextChoices):

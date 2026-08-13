@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Plus, Bug, ArrowLeft, Clock, Trash2 } from 'lucide-react'
+import { Plus, Bug, ArrowLeft, Clock, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
 import { useAnalyses, useDeleteAnalysis } from '../lib/queries'
+import type { AnalysisItem } from '../lib/queries'
+import { api } from '../lib/api'
 import { STATUS_ICON, STATUS_COLOR, isBusy } from '../lib/analysisStatus'
 import { Card } from '../components/common/Card'
 import { Button } from '../components/common/Button'
@@ -13,10 +15,34 @@ export function AnalysisListPage() {
   const { data, isLoading } = useAnalyses(projectId)
   const deleteAnalysis = useDeleteAnalysis()
   const [search, setSearch] = useState('')
+  const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set())
+  const [threads, setThreads] = useState<Record<string, AnalysisItem[]>>({})
 
   const analyses = data?.results?.filter(
     (a) => a.title.toLowerCase().includes(search.toLowerCase()),
   )
+
+  const toggleThread = async (rootId: string) => {
+    if (expandedThreads.has(rootId)) {
+      setExpandedThreads((prev) => {
+        const next = new Set(prev)
+        next.delete(rootId)
+        return next
+      })
+      return
+    }
+    setExpandedThreads((prev) => new Set(prev).add(rootId))
+    try {
+      const list = await api.get<AnalysisItem[]>(`/analyses/${rootId}/thread/`)
+      setThreads((prev) => ({ ...prev, [rootId]: list }))
+    } catch {
+      setExpandedThreads((prev) => {
+        const next = new Set(prev)
+        next.delete(rootId)
+        return next
+      })
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -85,9 +111,11 @@ export function AnalysisListPage() {
       <div className="space-y-3">
         {analyses?.map((a) => {
           const StatusIcon = STATUS_ICON[a.status] || Clock
+          const isExpanded = expandedThreads.has(a.id)
           return (
-            <div key={a.id} className="flex items-stretch gap-2">
-              <Link
+            <div key={a.id}>
+              <div className="flex items-stretch gap-2">
+                <Link
                   to={`/projects/${projectId}/analyses/${a.id}`}
                   className="block group flex-1 min-w-0"
                 >
@@ -102,9 +130,16 @@ export function AnalysisListPage() {
                           {a.duration_seconds ? ` · ${a.duration_seconds}s` : ''}
                         </p>
                       </div>
-                      <div className={`flex items-center gap-1.5 text-sm px-3 py-1 rounded-full border ${STATUS_COLOR[a.status] || 'border-gray-200'}`}>
-                        <StatusIcon className={`w-4 h-4 ${isBusy(a.status) ? 'animate-spin' : ''}`} />
-                        <span className="capitalize">{a.status}</span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {a.children_count > 0 && (
+                          <span className="text-xs bg-surface-alt text-text-secondary px-2 py-1 rounded-full">
+                            {a.children_count} retr{a.children_count === 1 ? 'y' : 'ies'}
+                          </span>
+                        )}
+                        <div className={`flex items-center gap-1.5 text-sm px-3 py-1 rounded-full border ${STATUS_COLOR[a.status] || 'border-gray-200'}`}>
+                          <StatusIcon className={`w-4 h-4 ${isBusy(a.status) ? 'animate-spin' : ''}`} />
+                          <span className="capitalize">{a.status}</span>
+                        </div>
                       </div>
                     </div>
                     {a.error_message && (
@@ -125,6 +160,56 @@ export function AnalysisListPage() {
                     <Trash2 className="w-4 h-4" />
                   </button>
                 )}
+                {a.children_count > 0 && (
+                  <button
+                    onClick={() => toggleThread(a.id)}
+                    className="self-center p-2 text-text-muted hover:text-primary transition-colors shrink-0"
+                    title={isExpanded ? 'Hide retries' : 'Show retries'}
+                  >
+                    {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </button>
+                )}
+              </div>
+              {isExpanded && (
+                <div className="ml-8 mt-2 space-y-2">
+                  {(threads[a.id] ?? []).map((child) => {
+                    const ChildIcon = STATUS_ICON[child.status] || Clock
+                    return (
+                      <Link
+                        key={child.id}
+                        to={`/projects/${projectId}/analyses/${child.id}`}
+                        className="block group"
+                      >
+                        <Card hover padding="sm" className="border-dashed">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <h4 className="text-sm font-medium text-text-primary group-hover:text-primary transition-colors truncate">
+                                Retry — {child.title || 'Untitled Analysis'}
+                              </h4>
+                              <p className="text-xs text-text-secondary mt-0.5">
+                                {new Date(child.created_at).toLocaleString()}
+                                {child.duration_seconds ? ` · ${child.duration_seconds}s` : ''}
+                              </p>
+                            </div>
+                            <div className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border shrink-0 ${STATUS_COLOR[child.status] || 'border-gray-200'}`}>
+                              <ChildIcon className={`w-3.5 h-3.5 ${isBusy(child.status) ? 'animate-spin' : ''}`} />
+                              <span className="capitalize">{child.status}</span>
+                            </div>
+                          </div>
+                          {child.error_message && (
+                            <p className="text-xs text-red-500 mt-2">{child.error_message}</p>
+                          )}
+                        </Card>
+                      </Link>
+                    )
+                  })}
+                  {!threads[a.id] && (
+                    <Card padding="sm" className="animate-pulse">
+                      <div className="h-4 bg-surface-alt rounded w-2/3" />
+                    </Card>
+                  )}
+                </div>
+              )}
             </div>
           )
         })}
