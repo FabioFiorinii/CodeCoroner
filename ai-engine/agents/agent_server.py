@@ -1,4 +1,5 @@
 import logging
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
@@ -26,6 +27,37 @@ bug_localizer = BugLocalizer()
 rca_agent = RootCauseAgent()
 report_gen = ReportGenerator()
 patch_gen = PatchGenerator()
+
+_installed_cache: set[str] | None = None
+_installed_cache_at = 0.0
+INSTALLED_TTL = 30.0
+
+
+async def installed_models():
+    global _installed_cache, _installed_cache_at
+    now = time.monotonic()
+    if _installed_cache is not None and now - _installed_cache_at < INSTALLED_TTL:
+        return _installed_cache
+    models = await ollama.list_models()
+    _installed_cache = set(models)
+    _installed_cache_at = now
+    return _installed_cache
+
+
+async def resolve_model(requested: str | None, default: str) -> str:
+    if not requested:
+        return default
+    try:
+        installed = await installed_models()
+        if requested in installed:
+            return requested
+        logger.warning(
+            'Model %s is not installed, falling back to %s', requested, default
+        )
+        return default
+    except Exception:
+        logger.warning('Could not check installed models, using requested %s', requested)
+        return requested
 
 
 class EmbedRequest(BaseModel):
@@ -109,11 +141,13 @@ async def list_models():
 
 @app.post('/pull-model')
 async def pull_model(req: PullModelRequest):
+    global _installed_cache
     try:
         result = await ollama.pull(req.model)
         status = result.get('status', 'ok')
         if status != 'success':
             raise RuntimeError(f'Ollama pull returned status "{status}"')
+        _installed_cache = None
         return {'status': 'ok', 'model': req.model}
     except Exception as exc:
         logger.error('Pull model %s failed: %s', req.model, exc)
@@ -162,8 +196,8 @@ async def index(req: IndexRequest):
 @app.post('/analyze-logs')
 async def analyze_logs(req: AnalyzeLogsRequest):
     try:
-        if req.model:
-            log_analyzer.settings.llm_model = req.model
+        model = await resolve_model(req.model, settings.llm_model)
+        log_analyzer.settings.llm_model = model
         result = await log_analyzer.run(req.error_context)
         if result.get('status') == 'error':
             raise HTTPException(status_code=502, detail=result.get('error', 'Log analysis failed'))
@@ -178,8 +212,8 @@ async def analyze_logs(req: AnalyzeLogsRequest):
 @app.post('/localize-bug')
 async def localize_bug(req: LocalizeBugRequest):
     try:
-        if req.model:
-            bug_localizer.settings.llm_model = req.model
+        model = await resolve_model(req.model, settings.llm_model)
+        bug_localizer.settings.llm_model = model
         result = await bug_localizer.run(
             repo_id=req.repo_id,
             error_context=req.error_context,
@@ -199,8 +233,8 @@ async def localize_bug(req: LocalizeBugRequest):
 @app.post('/analyze-root-cause')
 async def analyze_root_cause(req: RootCauseRequest):
     try:
-        if req.model:
-            rca_agent.settings.rca_model = req.model
+        model = await resolve_model(req.model, settings.rca_model)
+        rca_agent.settings.rca_model = model
         result = await rca_agent.run(
             repo_id=req.repo_id,
             error_context=req.error_context,
@@ -221,8 +255,8 @@ async def analyze_root_cause(req: RootCauseRequest):
 @app.post('/suggest-fix')
 async def suggest_fix(req: SuggestFixRequest):
     try:
-        if req.model:
-            patch_gen.settings.rca_model = req.model
+        model = await resolve_model(req.model, settings.rca_model)
+        patch_gen.settings.rca_model = model
         result = await patch_gen.run(
             error_context=req.error_context,
             log_analysis=req.log_analysis,
@@ -243,8 +277,8 @@ async def suggest_fix(req: SuggestFixRequest):
 @app.post('/generate-report')
 async def generate_report(req: ReportRequest):
     try:
-        if req.model:
-            report_gen.settings.llm_model = req.model
+        model = await resolve_model(req.model, settings.llm_model)
+        report_gen.settings.llm_model = model
         result = await report_gen.run(req.analysis_data)
         if result.get('status') == 'error':
             raise HTTPException(status_code=502, detail=result.get('error', 'Report generation failed'))
