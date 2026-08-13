@@ -308,7 +308,7 @@ export function AdminPage() {
                         size="sm"
                         onClick={() => {
                           setEditingUser(u)
-                          setEditGroups([...u.groups])
+                          setEditGroups(u.groups.length > 1 ? [u.groups[0]] : [...u.groups])
                         }}
                       >
                         Edit Groups
@@ -409,13 +409,11 @@ export function AdminPage() {
                     }`}
                   >
                     <input
-                      type="checkbox"
+                      type="radio"
+                      name="user-group"
+                      value={g.name}
                       checked={isSelected}
-                      onChange={() =>
-                        setEditGroups((prev) =>
-                          isSelected ? prev.filter((n) => n !== g.name) : [...prev, g.name],
-                        )
-                      }
+                      onChange={() => setEditGroups([g.name])}
                       className="w-4 h-4 accent-primary"
                     />
                     <div>

@@ -12,12 +12,11 @@ class DashboardView(APIView):
     def get(self, request):
         user = request.user
         user_model = get_user_model()
+        group_ids = user.groups.all()
+        team_members = user_model.objects.filter(groups__in=group_ids)
         if user.is_superuser:
-            team_members = user_model.objects.all()
             analyses = Analysis.objects.all()
         else:
-            group_ids = user.groups.all()
-            team_members = user_model.objects.filter(groups__in=group_ids)
             analyses = Analysis.objects.filter(user__groups__in=group_ids)
 
         recent = analyses.select_related('project').order_by('-created_at').distinct()[:5]
