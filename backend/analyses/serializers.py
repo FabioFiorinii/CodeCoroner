@@ -67,11 +67,14 @@ class AnalysisSerializer(serializers.ModelSerializer):
     fix_suggestion = FixSuggestionSerializer(read_only=True)
     report = ReportSerializer(read_only=True)
     repositories = RepositoryBasicSerializer(many=True, read_only=True)
+    user_email = serializers.EmailField(source='user.email', read_only=True)
+    user_username = serializers.CharField(source='user.username', read_only=True)
 
     class Meta:
         model = Analysis
         fields = [
-            'id', 'user', 'project', 'repository', 'repositories',
+            'id', 'user', 'user_email', 'user_username',
+            'project', 'repository', 'repositories',
             'title', 'error_context',
             'status', 'created_at', 'completed_at', 'duration_seconds',
             'error_message', 'runs', 'bug_localization', 'root_cause',

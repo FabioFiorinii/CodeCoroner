@@ -6,6 +6,7 @@ from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.db import transaction
+from django.utils import timezone
 from pgvector.django import CosineDistance
 
 from .models import Analysis, AnalysisRun, BugLocalization, SuspiciousFileScore, RootCause, FixSuggestion, Report
@@ -16,47 +17,79 @@ logger = logging.getLogger(__name__)
 AI_URL = getattr(settings, 'AI_ENGINE_URL', 'http://ai-engine:8002')
 
 
+def _safe_float(value, default=0.0):
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return default
+
+def _safe_int(value, default=None):
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return default
+
 class AnalysisOrchestrator:
     def __init__(self, analysis: Analysis):
         self.analysis = analysis
         self.channel_layer = get_channel_layer()
+        self.current_step = None
+
+    def _fail_current_step(self, error):
+        if self.current_step:
+            AnalysisRun.objects.filter(
+                analysis=self.analysis, step=self.current_step
+            ).update(status='failed', completed_at=timezone.now(), error=error)
 
     def execute(self):
         start_time = time.time()
         try:
             self._update_status(Analysis.Status.INDEXING)
-            self._record_run('ensure_repo_indexed')
+            self.current_step = 'ensure_repo_indexed'
+            self._record_run(self.current_step)
             self._ensure_repo_indexed()
+            self._mark_completed(self.current_step)
 
             self._update_status(Analysis.Status.ANALYZING)
-            self._record_run('analyze_input')
+            self.current_step = 'analyze_input'
+            self._record_run(self.current_step)
             self._analyze_input()
-            self._mark_completed('analyze_input')
+            self._mark_completed(self.current_step)
 
             self._update_status(Analysis.Status.BUG_LOCALIZATION)
-            self._record_run('bug_localization')
+            self.current_step = 'bug_localization'
+            self._record_run(self.current_step)
             self._localize_bug()
-            self._mark_completed('bug_localization')
+            self._mark_completed(self.current_step)
 
             self._update_status(Analysis.Status.RCA)
-            self._record_run('root_cause')
+            self.current_step = 'root_cause'
+            self._record_run(self.current_step)
             self._root_cause()
-            self._mark_completed('root_cause')
+            self._mark_completed(self.current_step)
 
-            self._record_run('generate_report')
+            self.current_step = 'generate_report'
+            self._record_run(self.current_step)
             self._generate_report()
-            self._mark_completed('generate_report')
+            self._mark_completed(self.current_step)
 
             self._update_status(Analysis.Status.FIX_SUGGESTION)
-            self._record_run('fix_suggestion')
+            self.current_step = 'fix_suggestion'
+            self._record_run(self.current_step)
             self._suggest_fix()
-            self._mark_completed('fix_suggestion')
+            self._mark_completed(self.current_step)
 
             self._update_status(Analysis.Status.COMPLETED)
+            self.current_step = None
             self._record_run('completed', status='completed')
 
         except Exception as e:
             logger.exception(f'Analysis {self.analysis.id} failed')
+            self._fail_current_step(str(e))
             self.analysis.status = Analysis.Status.FAILED
             self.analysis.error_message = str(e)
             with transaction.atomic():
@@ -75,7 +108,7 @@ class AnalysisOrchestrator:
     def _mark_completed(self, step):
         AnalysisRun.objects.filter(analysis=self.analysis, step=step).update(
             status='completed',
-            completed_at=time.time(),
+            completed_at=timezone.now(),
         )
 
     def _record_run(self, step, status='running', error=''):
@@ -85,7 +118,7 @@ class AnalysisOrchestrator:
             defaults={
                 'status': status,
                 'error': error,
-                'completed_at': time.time() if status in ('completed', 'failed') else None,
+                'completed_at': timezone.now() if status in ('completed', 'failed') else None,
             },
         )
         self._broadcast_status()
@@ -178,9 +211,9 @@ class AnalysisOrchestrator:
                 SuspiciousFileScore.objects.create(
                     localization=bug_loc,
                     file_path=item.get('file_path', ''),
-                    suspicion_score=item.get('score', 0.0),
+                    suspicion_score=_safe_float(item.get('score'), 0.0),
                     evidence=item.get('evidence', ''),
-                    rank=item.get('rank', 0),
+                    rank=_safe_int(item.get('rank'), 0),
                 )
 
         AnalysisRun.objects.filter(
@@ -212,9 +245,9 @@ class AnalysisOrchestrator:
             analysis=self.analysis,
             summary=result.get('summary', ''),
             root_file=result.get('root_file', ''),
-            root_line=result.get('root_line'),
+            root_line=_safe_int(result.get('root_line')),
             cause_chain=result.get('cause_chain', ''),
-            confidence=result.get('confidence', 0.0),
+            confidence=_safe_float(result.get('confidence'), 0.0),
             reasoning=result.get('reasoning', ''),
         )
 

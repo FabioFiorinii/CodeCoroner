@@ -15,6 +15,7 @@ class UserAdminViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all().order_by('-date_joined')
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated, IsSuperUser]
+    pagination_class = None
 
     def perform_destroy(self, instance):
         if instance == self.request.user:
@@ -37,6 +38,7 @@ class GroupViewSet(viewsets.ModelViewSet):
     queryset = Group.objects.all().order_by('name')
     serializer_class = GroupSerializer
     permission_classes = [permissions.IsAuthenticated, IsSuperUser]
+    pagination_class = None
 
 class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer

@@ -2,8 +2,10 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, Clock, CheckCircle2, AlertCircle, Loader2,
   FileCode, Target, FileSearch, BookOpen, Wrench, GitBranch, Globe,
+  FileText, Trash2,
 } from 'lucide-react'
-import { useAnalysis } from '../lib/queries'
+import { useAnalysis, useDeleteAnalysis } from '../lib/queries'
+import { useAuthStore } from '../stores/authStore'
 import { Card } from '../components/common/Card'
 import { Button } from '../components/common/Button'
 
@@ -39,6 +41,8 @@ export function AnalysisDetailPage() {
   const { projectId, id } = useParams<{ projectId: string; id: string }>()
   const navigate = useNavigate()
   const { data: analysis, isLoading, error } = useAnalysis(id)
+  const deleteAnalysis = useDeleteAnalysis()
+  const { user } = useAuthStore()
 
   if (isLoading) {
     return (
@@ -79,11 +83,35 @@ export function AnalysisDetailPage() {
           <ArrowLeft className="w-4 h-4" />
           Analyses
         </Link>
-        <h1 className="text-2xl font-bold text-text-primary">{analysis.title || 'Untitled Analysis'}</h1>
-        <p className="text-text-secondary mt-1">
-          {new Date(analysis.created_at).toLocaleString()}
-          {analysis.duration_seconds ? ` · ${formatDuration(analysis.duration_seconds)}` : ''}
-        </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-text-primary">{analysis.title || 'Untitled Analysis'}</h1>
+            <p className="text-text-secondary mt-1">
+              {new Date(analysis.created_at).toLocaleString()}
+              {analysis.duration_seconds ? ` · ${formatDuration(analysis.duration_seconds)}` : ''}
+            </p>
+            <p className="text-xs text-text-muted mt-1">
+              by {analysis.user_email || analysis.user_username || analysis.user}
+            </p>
+          </div>
+          {user?.is_superuser && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-red-500 hover:text-red-600 hover:bg-red-50 shrink-0"
+              onClick={() => {
+                if (confirm('Delete this analysis? This cannot be undone.')) {
+                  deleteAnalysis.mutate(analysis.id, {
+                    onSuccess: () => navigate(`/projects/${projectId}/analyses`),
+                  })
+                }
+              }}
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete
+            </Button>
+          )}
+        </div>
       </div>
 
       {analysis.repositories && analysis.repositories.length > 0 && (
@@ -107,6 +135,33 @@ export function AnalysisDetailPage() {
                   <p className="text-xs text-text-muted">{r.git_branch}</p>
                 </div>
               </Link>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {analysis.error_context && Object.keys(analysis.error_context).length > 0 && (
+        <Card padding="md">
+          <h3 className="font-semibold text-text-primary flex items-center gap-2 mb-3 text-sm">
+            <FileText className="w-4 h-4" />
+            Input Details
+          </h3>
+          <div className="space-y-3">
+            {Object.entries(analysis.error_context).map(([key, value]) => (
+              <div key={key}>
+                <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-1">
+                  {key.replace(/_/g, ' ')}
+                </p>
+                {typeof value === 'string' && value.length > 100 ? (
+                  <pre className="text-xs font-mono bg-surface-alt rounded p-3 overflow-x-auto whitespace-pre-wrap leading-relaxed border max-h-48 overflow-y-auto">
+                    {value}
+                  </pre>
+                ) : (
+                  <p className="text-sm text-text-secondary">
+                    {typeof value === 'string' ? value : JSON.stringify(value, null, 2)}
+                  </p>
+                )}
+              </div>
             ))}
           </div>
         </Card>

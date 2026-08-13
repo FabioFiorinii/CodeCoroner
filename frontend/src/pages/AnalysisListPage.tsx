@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Plus, Bug, ArrowLeft, Clock, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
-import { useAnalyses } from '../lib/queries'
+import { Plus, Bug, ArrowLeft, Clock, CheckCircle2, AlertCircle, Loader2, Trash2 } from 'lucide-react'
+import { useAnalyses, useDeleteAnalysis } from '../lib/queries'
 import { Card } from '../components/common/Card'
 import { Button } from '../components/common/Button'
+import { useAuthStore } from '../stores/authStore'
 
 const STATUS_ICON: Record<string, typeof Clock> = {
   queued: Clock,
@@ -27,7 +28,9 @@ const STATUS_COLOR: Record<string, string> = {
 
 export function AnalysisListPage() {
   const { projectId } = useParams<{ projectId: string }>()
+  const { user } = useAuthStore()
   const { data, isLoading } = useAnalyses(projectId)
+  const deleteAnalysis = useDeleteAnalysis()
   const [search, setSearch] = useState('')
 
   const analyses = data?.results?.filter(
@@ -104,32 +107,46 @@ export function AnalysisListPage() {
         {analyses?.map((a) => {
           const StatusIcon = STATUS_ICON[a.status] || Clock
           return (
-            <Link
-              key={a.id}
-              to={`/projects/${projectId}/analyses/${a.id}`}
-              className="block group"
-            >
-              <Card hover padding="md">
-                <div className="flex items-center justify-between">
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold text-text-primary group-hover:text-primary transition-colors truncate">
-                      {a.title || 'Untitled Analysis'}
-                    </h3>
-                    <p className="text-sm text-text-secondary mt-0.5">
-                      {new Date(a.created_at).toLocaleString()}
-                      {a.duration_seconds ? ` · ${a.duration_seconds}s` : ''}
-                    </p>
-                  </div>
-                  <div className={`flex items-center gap-1.5 text-sm px-3 py-1 rounded-full border ${STATUS_COLOR[a.status] || 'border-gray-200'}`}>
-                    <StatusIcon className={`w-4 h-4 ${isBusy(a.status) ? 'animate-spin' : ''}`} />
-                    <span className="capitalize">{a.status}</span>
-                  </div>
-                </div>
-                {a.error_message && (
-                  <p className="text-sm text-red-500 mt-2">{a.error_message}</p>
+            <div key={a.id} className="flex items-stretch gap-2">
+              <Link
+                  to={`/projects/${projectId}/analyses/${a.id}`}
+                  className="block group flex-1 min-w-0"
+                >
+                  <Card hover padding="md" className="h-full">
+                    <div className="flex items-center justify-between">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-semibold text-text-primary group-hover:text-primary transition-colors truncate">
+                          {a.title || 'Untitled Analysis'}
+                        </h3>
+                        <p className="text-sm text-text-secondary mt-0.5">
+                          {new Date(a.created_at).toLocaleString()}
+                          {a.duration_seconds ? ` · ${a.duration_seconds}s` : ''}
+                        </p>
+                      </div>
+                      <div className={`flex items-center gap-1.5 text-sm px-3 py-1 rounded-full border ${STATUS_COLOR[a.status] || 'border-gray-200'}`}>
+                        <StatusIcon className={`w-4 h-4 ${isBusy(a.status) ? 'animate-spin' : ''}`} />
+                        <span className="capitalize">{a.status}</span>
+                      </div>
+                    </div>
+                    {a.error_message && (
+                      <p className="text-sm text-red-500 mt-2">{a.error_message}</p>
+                    )}
+                  </Card>
+                </Link>
+                {user?.is_superuser && (
+                  <button
+                    onClick={() => {
+                      if (confirm(`Delete "${a.title || 'Untitled Analysis'}"?`)) {
+                        deleteAnalysis.mutate(a.id)
+                      }
+                    }}
+                    className="self-center p-2 text-text-muted hover:text-red-500 transition-colors shrink-0"
+                    title="Delete analysis"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 )}
-              </Card>
-            </Link>
+            </div>
           )
         })}
       </div>

@@ -17,8 +17,8 @@ export default function Layout() {
   }
 
   return (
-    <div className="min-h-screen flex bg-surface">
-      <aside className="w-64 bg-surface-dark border-r border-white/5 flex flex-col">
+    <div className="h-screen flex bg-surface">
+      <aside className="w-64 bg-surface-dark border-r border-white/5 flex flex-col shrink-0 h-screen sticky top-0">
         <div className="p-6 border-b border-white/5">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">

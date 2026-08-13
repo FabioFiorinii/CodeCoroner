@@ -45,6 +45,15 @@ class AnalysisViewSet(viewsets.ModelViewSet):
         out = AnalysisSerializer(analysis, context=self.get_serializer_context())
         return Response(out.data, status=status.HTTP_201_CREATED)
 
+    def destroy(self, request, *args, **kwargs):
+        analysis = self.get_object()
+        if not request.user.is_superuser and analysis.user != request.user:
+            return Response(
+                {'detail': 'You do not have permission to delete this analysis.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return super().destroy(request, *args, **kwargs)
+
     @action(detail=True, methods=['get'])
     def status(self, request, pk=None):
         analysis = self.get_object()

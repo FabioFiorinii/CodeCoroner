@@ -224,6 +224,8 @@ const ANALYSES_KEY = 'analyses'
 export interface AnalysisItem {
   id: string
   user: string
+  user_email: string
+  user_username: string
   project: string
   repository: string
   repositories: Array<{
@@ -310,6 +312,14 @@ export function useCreateAnalysis() {
   const qc = useQueryClient()
   return useMutation<AnalysisItem, Error, AnalysisInput>({
     mutationFn: (data) => api.post<AnalysisItem>('/analyses/', data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [ANALYSES_KEY] }),
+  })
+}
+
+export function useDeleteAnalysis() {
+  const qc = useQueryClient()
+  return useMutation<void, Error, string>({
+    mutationFn: (id) => api.delete(`/analyses/${id}/`),
     onSuccess: () => qc.invalidateQueries({ queryKey: [ANALYSES_KEY] }),
   })
 }
