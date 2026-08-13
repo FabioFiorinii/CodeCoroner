@@ -2,6 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView, TokenBlacklistView
 from .views import RegisterView, LoginView, UserDetailView, UserAdminViewSet, GroupViewSet
+from common.views import ModelSettingsView
 
 admin_router = DefaultRouter()
 admin_router.register(r'users', UserAdminViewSet, basename='admin-user')
@@ -14,4 +15,5 @@ urlpatterns = [
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('token/blacklist/', TokenBlacklistView.as_view(), name='token_blacklist'),
     path('admin/', include(admin_router.urls)),
+    path('admin/model-settings/', ModelSettingsView.as_view(), name='model-settings'),
 ]

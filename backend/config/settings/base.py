@@ -154,6 +154,27 @@ SIMPLE_JWT = {
 
 AI_ENGINE_URL = os.environ.get('AI_ENGINE_URL', 'http://ai-engine:8002')
 
+MODEL_TIERS = {
+    'fast': {
+        'label': 'Veloce',
+        'llm_model': 'qwen2.5-coder:1.5b',
+        'rca_model': 'qwen2.5-coder:1.5b',
+        'params': '1.5B',
+    },
+    'balanced': {
+        'label': 'Equilibrato',
+        'llm_model': 'qwen2.5-coder:3b',
+        'rca_model': 'qwen2.5-coder:3b',
+        'params': '3.1B',
+    },
+    'precise': {
+        'label': 'Preciso',
+        'llm_model': 'qwen2.5-coder:7b',
+        'rca_model': 'qwen2.5-coder:7b',
+        'params': '7.6B',
+    },
+}
+
 CORS_ALLOWED_ORIGINS = os.environ.get(
     'CORS_ALLOWED_ORIGINS',
     'http://localhost:8080,http://localhost:5173',

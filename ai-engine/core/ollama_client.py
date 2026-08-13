@@ -4,6 +4,8 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+PULL_TIMEOUT = 1800.0
+
 class OllamaClient:
     def __init__(self, base_url: str = 'http://ollama:11434'):
         self.client = httpx.AsyncClient(base_url=base_url, timeout=600.0)
@@ -17,6 +19,20 @@ class OllamaClient:
         })
         response.raise_for_status()
         return response.json()['response']
+
+    async def pull(self, model: str) -> dict:
+        async with httpx.AsyncClient(base_url=self.client.base_url, timeout=PULL_TIMEOUT) as client:
+            response = await client.post('/api/pull', json={
+                'model': model,
+                'stream': False,
+            })
+            response.raise_for_status()
+            return response.json()
+
+    async def list_models(self) -> list[str]:
+        response = await self.client.get('/api/tags')
+        response.raise_for_status()
+        return [m['name'] for m in response.json().get('models', [])]
 
     async def embed(self, model: str, input_text: str | list[str]) -> list[float] | list[list[float]]:
         inputs = input_text if isinstance(input_text, list) else [input_text]

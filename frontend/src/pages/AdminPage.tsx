@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Shield, Users, UserX, Save, Plus, X, Search } from 'lucide-react'
+import { Shield, Users, UserX, Save, Plus, X, Search, Sparkles, Download } from 'lucide-react'
 import { Card } from '../components/common/Card'
 import { Button } from '../components/common/Button'
 import { useAuthStore } from '../stores/authStore'
-import { api } from '../lib/api'
+import { api, ApiError } from '../lib/api'
 
 interface AdminUser {
   id: number
@@ -22,6 +22,22 @@ interface GroupItem {
   user_count: number
 }
 
+interface ModelOption {
+  key: string
+  label: string
+  model: string
+  params: string
+  installed: boolean
+}
+
+interface ModelSettings {
+  tier: string
+  model: string
+  available: ModelOption[]
+}
+
+const TIER_KEYS = ['fast', 'balanced', 'precise']
+
 export function AdminPage() {
   const { user } = useAuthStore()
   const navigate = useNavigate()
@@ -33,6 +49,11 @@ export function AdminPage() {
   const [editGroups, setEditGroups] = useState<string[]>([])
   const [showNewGroup, setShowNewGroup] = useState(false)
   const [newGroupName, setNewGroupName] = useState('')
+  const [modelSettings, setModelSettings] = useState<ModelSettings | null>(null)
+  const [tierIndex, setTierIndex] = useState(1)
+  const [savingModels, setSavingModels] = useState(false)
+  const [saveModelError, setSaveModelError] = useState<string | null>(null)
+  const [saveModelSuccess, setSaveModelSuccess] = useState<string | null>(null)
 
   useEffect(() => {
     if (!user?.is_superuser) {
@@ -42,12 +63,23 @@ export function AdminPage() {
     loadData()
   }, [])
 
+  const fetchModelSettings = async () => {
+    try {
+      const data = await api.get<ModelSettings>('/auth/admin/model-settings/')
+      setModelSettings(data)
+      setTierIndex(TIER_KEYS.indexOf(data.tier) >= 0 ? TIER_KEYS.indexOf(data.tier) : 1)
+    } catch (err) {
+      console.error('Failed to load model settings', err)
+    }
+  }
+
   const loadData = async () => {
     setLoading(true)
     try {
       const [usersData, groupsData] = await Promise.all([
         api.get<AdminUser[]>('/auth/admin/users/'),
         api.get<GroupItem[]>('/auth/admin/groups/'),
+        fetchModelSettings(),
       ])
       setUsers(usersData)
       setGroups(groupsData)
@@ -107,6 +139,32 @@ export function AdminPage() {
       console.error('Failed to delete group', err)
     }
   }
+
+  const handleSaveModelSettings = async () => {
+    if (!modelSettings) return
+    setSavingModels(true)
+    setSaveModelError(null)
+    setSaveModelSuccess(null)
+    try {
+      const res = await api.put<{ tier: string; detail: string }>(
+        '/auth/admin/model-settings/',
+        { tier: TIER_KEYS[tierIndex] },
+      )
+      setSaveModelSuccess(res.detail || 'Model profile saved')
+      await fetchModelSettings()
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? ((err.body as { detail?: string } | null)?.detail as string) || err.message
+          : 'Failed to save model settings'
+      setSaveModelError(message)
+      await fetchModelSettings()
+    } finally {
+      setSavingModels(false)
+    }
+  }
+
+  const selectedTier = modelSettings?.available.find((a) => a.key === TIER_KEYS[tierIndex]) ?? null
 
   if (!user?.is_superuser) {
     return null
@@ -210,7 +268,74 @@ export function AdminPage() {
               )}
             </div>
           )}
-        </div>
+
+        <Card padding="lg">
+          <h2 className="text-lg font-semibold text-text-primary flex items-center gap-2">
+            <Sparkles className="w-5 h-5" />
+            AI Models
+          </h2>
+          <p className="text-sm text-text-secondary mt-1 mb-4">
+            Quality vs speed for the analysis pipeline. The selected model is downloaded and
+            verified automatically when you save; if anything fails, the previous model stays active.
+          </p>
+
+          <input
+            type="range"
+            min={0}
+            max={2}
+            step={1}
+            value={tierIndex}
+            disabled={savingModels || !modelSettings}
+            onChange={(e) => {
+              setTierIndex(Number(e.target.value))
+              setSaveModelSuccess(null)
+            }}
+            className="w-full accent-primary"
+          />
+          <div className="flex justify-between text-sm mt-1">
+            {modelSettings?.available.map((opt, i) => (
+              <span
+                key={opt.key}
+                className={i === tierIndex ? 'text-primary font-medium' : 'text-text-muted'}
+              >
+                {opt.label}
+              </span>
+            ))}
+          </div>
+
+          {selectedTier && (
+            <div className="mt-4 p-3 rounded-lg bg-surface-alt">
+              <p className="text-sm font-medium text-text-primary">{selectedTier.model}</p>
+              <p className="text-xs text-text-muted">{selectedTier.params} parameters</p>
+              {!selectedTier.installed && (
+                <p className="text-xs text-amber-500 mt-1">
+                  Not installed yet — it will be downloaded when you save.
+                </p>
+              )}
+            </div>
+          )}
+
+          <div className="mt-4">
+            <Button onClick={handleSaveModelSettings} disabled={savingModels || !modelSettings}>
+              {savingModels ? (
+                'Downloading model...'
+              ) : (
+                <>
+                  <Download className="w-4 h-4" />
+                  Save & Install
+                </>
+              )}
+            </Button>
+          </div>
+
+          {saveModelSuccess && (
+            <p className="text-sm text-green-500 mt-3">{saveModelSuccess}</p>
+          )}
+          {saveModelError && (
+            <p className="text-sm text-red-500 mt-3">{saveModelError}</p>
+          )}
+        </Card>
+      </div>
 
         <div className="space-y-4">
           <div className="flex items-center justify-between">

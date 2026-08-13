@@ -38,6 +38,16 @@ class AnalysisOrchestrator:
         self.analysis = analysis
         self.channel_layer = get_channel_layer()
         self.current_step = None
+        self.model_llm, self.model_rca = self._resolve_models()
+
+    def _resolve_models(self):
+        try:
+            from common.models import PlatformSetting
+            tier = PlatformSetting.get_solo().model_tier
+            cfg = settings.MODEL_TIERS.get(tier, {})
+            return cfg.get('llm_model', ''), cfg.get('rca_model', '')
+        except Exception:
+            return '', ''
 
     def _fail_current_step(self, error):
         if self.current_step:
@@ -154,6 +164,7 @@ class AnalysisOrchestrator:
     def _analyze_input(self):
         result = self._call_ai('analyze-logs', {
             'error_context': self.analysis.error_context,
+            'model': self.model_llm,
         })
         self.log_analysis = result
         AnalysisRun.objects.filter(
@@ -198,6 +209,7 @@ class AnalysisOrchestrator:
             'error_context': ctx,
             'log_analysis': self.log_analysis,
             'chunks': chunks_for_ai,
+            'model': self.model_llm,
         })
         self.localization_result = result
 
@@ -238,6 +250,7 @@ class AnalysisOrchestrator:
             'log_analysis': self.log_analysis,
             'suspicious_files': suspicious,
             'chunks': root_chunks,
+            'model': self.model_rca,
         })
         self.rca_result = result
 
@@ -295,6 +308,7 @@ class AnalysisOrchestrator:
 
         result = self._call_ai('generate-report', {
             'analysis_data': analysis_data,
+            'model': self.model_llm,
         })
 
         Report.objects.create(
@@ -336,6 +350,7 @@ class AnalysisOrchestrator:
             'bug_localization': bug_loc,
             'root_cause': rca,
             'chunks': getattr(self, 'top_chunks', [])[:5],
+            'model': self.model_rca,
         })
 
         FixSuggestion.objects.create(

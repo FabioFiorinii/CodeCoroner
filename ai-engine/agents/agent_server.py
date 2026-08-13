@@ -39,6 +39,7 @@ class IndexRequest(BaseModel):
 
 class AnalyzeLogsRequest(BaseModel):
     error_context: dict
+    model: str | None = None
 
 
 class LocalizeBugRequest(BaseModel):
@@ -46,6 +47,7 @@ class LocalizeBugRequest(BaseModel):
     error_context: dict
     log_analysis: dict
     chunks: list
+    model: str | None = None
 
 
 class RootCauseRequest(BaseModel):
@@ -54,10 +56,12 @@ class RootCauseRequest(BaseModel):
     log_analysis: dict
     suspicious_files: list
     chunks: list
+    model: str | None = None
 
 
 class ReportRequest(BaseModel):
     analysis_data: dict
+    model: str | None = None
 
 
 class SuggestFixRequest(BaseModel):
@@ -66,6 +70,11 @@ class SuggestFixRequest(BaseModel):
     bug_localization: dict | None = None
     root_cause: dict | None = None
     chunks: list = []
+    model: str | None = None
+
+
+class PullModelRequest(BaseModel):
+    model: str
 
 
 @asynccontextmanager
@@ -86,6 +95,39 @@ app = FastAPI(title='CodeCoroner AI Engine', version='0.1.0', lifespan=lifespan)
 async def health():
     healthy = await ollama.health()
     return {'status': 'healthy' if healthy else 'unhealthy', 'ollama': healthy}
+
+
+@app.get('/models')
+async def list_models():
+    try:
+        models = await ollama.list_models()
+        return {'models': models}
+    except Exception as exc:
+        logger.error('List models failed: %s', exc)
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+@app.post('/pull-model')
+async def pull_model(req: PullModelRequest):
+    try:
+        result = await ollama.pull(req.model)
+        status = result.get('status', 'ok')
+        if status != 'success':
+            raise RuntimeError(f'Ollama pull returned status "{status}"')
+        return {'status': 'ok', 'model': req.model}
+    except Exception as exc:
+        logger.error('Pull model %s failed: %s', req.model, exc)
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+@app.post('/test-model')
+async def test_model(req: PullModelRequest):
+    try:
+        await ollama.generate(req.model, 'Reply with the single word: ok')
+        return {'status': 'ok', 'model': req.model}
+    except Exception as exc:
+        logger.error('Model test %s failed: %s', req.model, exc)
+        raise HTTPException(status_code=502, detail=str(exc))
 
 
 @app.post('/embed')
@@ -120,6 +162,8 @@ async def index(req: IndexRequest):
 @app.post('/analyze-logs')
 async def analyze_logs(req: AnalyzeLogsRequest):
     try:
+        if req.model:
+            log_analyzer.settings.llm_model = req.model
         result = await log_analyzer.run(req.error_context)
         if result.get('status') == 'error':
             raise HTTPException(status_code=502, detail=result.get('error', 'Log analysis failed'))
@@ -134,6 +178,8 @@ async def analyze_logs(req: AnalyzeLogsRequest):
 @app.post('/localize-bug')
 async def localize_bug(req: LocalizeBugRequest):
     try:
+        if req.model:
+            bug_localizer.settings.llm_model = req.model
         result = await bug_localizer.run(
             repo_id=req.repo_id,
             error_context=req.error_context,
@@ -153,6 +199,8 @@ async def localize_bug(req: LocalizeBugRequest):
 @app.post('/analyze-root-cause')
 async def analyze_root_cause(req: RootCauseRequest):
     try:
+        if req.model:
+            rca_agent.settings.rca_model = req.model
         result = await rca_agent.run(
             repo_id=req.repo_id,
             error_context=req.error_context,
@@ -173,6 +221,8 @@ async def analyze_root_cause(req: RootCauseRequest):
 @app.post('/suggest-fix')
 async def suggest_fix(req: SuggestFixRequest):
     try:
+        if req.model:
+            patch_gen.settings.rca_model = req.model
         result = await patch_gen.run(
             error_context=req.error_context,
             log_analysis=req.log_analysis,
@@ -193,6 +243,8 @@ async def suggest_fix(req: SuggestFixRequest):
 @app.post('/generate-report')
 async def generate_report(req: ReportRequest):
     try:
+        if req.model:
+            report_gen.settings.llm_model = req.model
         result = await report_gen.run(req.analysis_data)
         if result.get('status') == 'error':
             raise HTTPException(status_code=502, detail=result.get('error', 'Report generation failed'))
