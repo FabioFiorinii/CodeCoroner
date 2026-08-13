@@ -1,4 +1,4 @@
-import { useNavigate, Link } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useProjects, useRepositories, useDashboard } from '../lib/queries'
 import { STATUS_ICON, STATUS_COLOR, isBusy } from '../lib/analysisStatus'
 import { Card } from '../components/common/Card'
@@ -11,26 +11,19 @@ export function DashboardPage() {
   const { data: projectsData } = useProjects()
   const { data: reposData } = useRepositories()
   const { data: dashboard } = useDashboard()
-  const navigate = useNavigate()
 
   const projects = projectsData?.results ?? []
   const recentAnalyses = dashboard?.recent_analyses ?? []
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">
-            Welcome back, {user?.username ?? 'Developer'}
-          </h1>
-          <p className="text-text-secondary mt-1">
-            Here's an overview of your debugging workspace.
-          </p>
-        </div>
-        <Button onClick={() => navigate('/projects/new')}>
-          <Plus className="w-4 h-4" />
-          New Project
-        </Button>
+      <div>
+        <h1 className="text-2xl font-bold text-text-primary">
+          Welcome back, {user?.username ?? 'Developer'}
+        </h1>
+        <p className="text-text-secondary mt-1">
+          Here's an overview of your debugging workspace.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
