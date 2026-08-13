@@ -15,6 +15,7 @@ import { AnalysisNewPage } from './pages/AnalysisNewPage'
 import { AnalysisDetailPage } from './pages/AnalysisDetailPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { AdminPage } from './pages/AdminPage'
+import { ProfilePage } from './pages/ProfilePage'
 
 function App() {
   return (
@@ -46,6 +47,7 @@ function App() {
           <Route path="analyses" element={<Navigate to="/projects" replace />} />
           <Route path="analyses/:id" element={<Navigate to="/projects" replace />} />
           <Route path="admin" element={<AdminPage />} />
+          <Route path="profile" element={<ProfilePage />} />
         </Route>
       </Routes>
     </BrowserRouter>

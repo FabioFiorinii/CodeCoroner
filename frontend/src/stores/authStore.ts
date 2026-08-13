@@ -8,6 +8,7 @@ interface User {
   username: string
   is_active: boolean
   is_superuser: boolean
+  date_joined: string
   groups: string[]
 }
 

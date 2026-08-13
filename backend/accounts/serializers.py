@@ -45,3 +45,13 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ['id', 'email', 'username', 'is_active', 'is_superuser', 'date_joined', 'api_rate_limit', 'groups']
         read_only_fields = ['id', 'is_active', 'is_superuser', 'date_joined']
+
+class ChangePasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True, min_length=8)
+
+    def validate_old_password(self, value):
+        request = self.context.get('request')
+        if not request or not request.user.check_password(value):
+            raise serializers.ValidationError('Current password is incorrect.')
+        return value

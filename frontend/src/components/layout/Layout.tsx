@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 
 const navItems = [
@@ -10,11 +10,14 @@ const navItems = [
 export default function Layout() {
   const { user, logout } = useAuthStore()
   const navigate = useNavigate()
+  const location = useLocation()
 
   const handleLogout = () => {
     logout()
     navigate('/login', { replace: true })
   }
+
+  const isProfileActive = location.pathname === '/profile'
 
   return (
     <div className="h-screen flex bg-surface">
@@ -69,13 +72,20 @@ export default function Layout() {
 
         {user && (
           <div className="p-4 border-t border-white/5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+            <button
+              onClick={() => navigate('/profile')}
+              className={`w-full flex items-center gap-3 mb-3 px-2 py-2 rounded-lg transition-all duration-200 cursor-pointer ${
+                isProfileActive
+                  ? 'bg-primary/10'
+                  : 'hover:bg-white/5'
+              }`}
+            >
+              <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
                 <span className="text-primary text-sm font-semibold">
                   {user.username.charAt(0).toUpperCase()}
                 </span>
               </div>
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 text-left">
                 <p className="text-sm font-medium text-text-inverse truncate">
                   {user.username}
                 </p>
@@ -83,7 +93,7 @@ export default function Layout() {
                   {user.email}
                 </p>
               </div>
-            </div>
+            </button>
             <button
               onClick={handleLogout}
               className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm text-text-inverse/50 hover:text-red-400 hover:bg-white/5 transition-all duration-200"
