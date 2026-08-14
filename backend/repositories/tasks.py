@@ -72,11 +72,13 @@ def index_repository_task(self, repo_id: str):
     indexed = 0
     errors = 0
     total_bytes = 0
+    seen_paths = set()
 
     for file_path in repo_path.rglob('*'):
         if not file_path.is_file():
             continue
         rel = file_path.relative_to(repo_path)
+        seen_paths.add(str(rel).replace('\\', '/'))
         if any(p in IGNORED_DIRS for p in rel.parts):
             continue
         ext = file_path.suffix.lower()
@@ -108,6 +110,12 @@ def index_repository_task(self, repo_id: str):
     repo.file_count = indexed
     repo.total_bytes = total_bytes
     repo.save(update_fields=['file_count', 'total_bytes'])
+
+    stale = repo.indexed_files.exclude(file_path__in=seen_paths)
+    if stale.exists():
+        deleted = stale.count()
+        stale.delete()
+        logger.info('Pruned %d stale files in repo %s', deleted, repo_id)
 
     logger.info('Indexed %d files in repo %s', indexed, repo_id)
 
@@ -233,3 +241,25 @@ def _set_error(repo: Repository, message: str):
     repo.error_message = message
     repo.save(update_fields=['status', 'error_message'])
     logger.error('[%s] %s', repo.id, message)
+
+
+@shared_task(bind=True, max_retries=1)
+def run_daily_pulls(self):
+    repos = Repository.objects.filter(auto_pull=True)
+    busy = (Repository.Status.CLONING, Repository.Status.INDEXING)
+    pulled = skipped = 0
+    for repo in repos:
+        if repo.status in busy:
+            skipped += 1
+            continue
+        try:
+            local_path = git_service.clone_or_pull(repo.git_url, repo.git_branch, str(repo.id))
+            repo.local_path = str(local_path)
+            repo.status = Repository.Status.INDEXING
+            repo.save(update_fields=['local_path', 'status'])
+            index_repository_task(str(repo.id))
+            pulled += 1
+        except Exception as exc:
+            logger.error('Daily pull failed for %s: %s', repo.id, exc)
+            _set_error(repo, f'Pull failed: {exc}')
+    logger.info('Daily pull: %d pulled, %d skipped', pulled, skipped)

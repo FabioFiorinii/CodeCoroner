@@ -66,6 +66,7 @@ export interface RepositoryItem {
   id: string
   git_url: string
   git_branch: string
+  auto_pull: boolean
   status: 'pending' | 'cloning' | 'indexing' | 'indexed' | 'error'
   file_count: number
   total_bytes: number
@@ -151,6 +152,18 @@ export function useCreateRepository() {
     mutationFn: (data) => api.post<RepositoryItem>('/repositories/', data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [REPOS_KEY] })
+    },
+  })
+}
+
+export function useUpdateRepository(id: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: Partial<Pick<RepositoryItem, 'auto_pull' | 'git_branch'>>) =>
+      api.patch(`/repositories/${id}/`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [REPOS_KEY] })
+      qc.invalidateQueries({ queryKey: [REPOS_KEY, id] })
     },
   })
 }

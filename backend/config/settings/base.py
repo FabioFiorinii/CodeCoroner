@@ -155,6 +155,9 @@ SIMPLE_JWT = {
 
 AI_ENGINE_URL = os.environ.get('AI_ENGINE_URL', 'http://ai-engine:8002')
 
+AUTO_PULL_HOUR = int(os.environ.get('AUTO_PULL_HOUR', '3'))
+AUTO_PULL_MINUTE = int(os.environ.get('AUTO_PULL_MINUTE', '0'))
+
 MODEL_TIERS = {
     'fast': {
         'label': 'Fast',

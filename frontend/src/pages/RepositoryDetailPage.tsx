@@ -8,6 +8,7 @@ import {
   useRepository, useDeleteRepository,
   useIndexRepository, useReindexRepository,
   useRepositoryFiles, useRepositoryChunks,
+  useUpdateRepository,
 } from '../lib/queries'
 import { Card } from '../components/common/Card'
 import { Button } from '../components/common/Button'
@@ -35,6 +36,7 @@ export function RepositoryDetailPage() {
   const deleteRepo = useDeleteRepository()
   const indexRepo = useIndexRepository()
   const reindexRepo = useReindexRepository()
+  const updateRepo = useUpdateRepository(repoId)
   const { data: filesData } = useRepositoryFiles(repoId)
   const { data: chunksData } = useRepositoryChunks(repoId)
   const [showChunks, setShowChunks] = useState(false)
@@ -105,7 +107,7 @@ export function RepositoryDetailPage() {
               disabled={isBusy}
             >
               <Play className="w-4 h-4" />
-              Index
+              Pull &amp; Index
             </Button>
             <Button
               variant="secondary"
@@ -161,6 +163,23 @@ export function RepositoryDetailPage() {
           <p className="text-xs text-text-muted">Last Indexed</p>
         </Card>
       </div>
+
+      <Card padding="md">
+        <label className="flex items-center justify-between gap-4 cursor-pointer">
+          <div>
+            <p className="font-medium text-text-primary">Auto-pull daily</p>
+            <p className="text-sm text-text-muted">
+              Pull the latest changes and re-index once a day at 03:00 UTC.
+            </p>
+          </div>
+          <input
+            type="checkbox"
+            checked={repo.auto_pull}
+            onChange={(e) => updateRepo.mutate({ auto_pull: e.target.checked })}
+            className="w-5 h-5 accent-primary"
+          />
+        </label>
+      </Card>
 
       <Card padding="lg">
         <div className="flex items-center justify-between mb-4">

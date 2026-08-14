@@ -26,6 +26,7 @@ class Repository(models.Model):
     groups = models.ManyToManyField('auth.Group', related_name='repositories', blank=True)
     git_url = models.CharField(max_length=2048)
     git_branch = models.CharField(max_length=255, default='main')
+    auto_pull = models.BooleanField(default=False)
     local_path = models.CharField(max_length=1024, null=True, blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     file_count = models.IntegerField(default=0)

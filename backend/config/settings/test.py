@@ -29,6 +29,8 @@ CHANNEL_LAYERS = {
 CELERY_TASK_ALWAYS_EAGER = True
 CELERY_TASK_EAGER_PROPAGATES = True
 
+TEST_RUNNER = 'common.test_runner.PgVectorTestRunner'
+
 PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
 
 LOGGING['root']['level'] = 'CRITICAL'

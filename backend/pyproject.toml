@@ -26,13 +26,13 @@ quote-style = "single"
 python_version = "3.13"
 ignore_missing_imports = true
 strict = false
-django_settings_module = "config.settings.dev"
-plugins = ["mypy_django_plugin.plugin"]
+plugins = ["mypy_django_plugin.main"]
 
-[tool.mypy.plugins.django-stubs]
+[tool.django-stubs]
 django_settings_module = "config.settings.dev"
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings.test"
 python_files = ["tests.py", "test_*.py", "*_tests.py"]
 testpaths = ["."]
+norecursedirs = ["media", "static", "*.egg", ".*", "node_modules", "venv"]

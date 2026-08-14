@@ -8,6 +8,15 @@ from repositories.chunking import SemanticChunker
 User = get_user_model()
 
 
+def _make_repo(project, **kwargs):
+    return Repository.objects.create(
+        project=project,
+        git_url='https://github.com/user/repo.git',
+        git_branch='main',
+        **kwargs,
+    )
+
+
 class CloneTaskTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
@@ -123,3 +132,80 @@ class IndexTaskTests(TestCase):
         ])
         count = CodeChunk.objects.filter(file=indexed).count()
         self.assertEqual(count, 1)
+
+
+class PruneTaskTests(TestCase):
+    def setUp(self):
+        import tempfile
+        self.user = User.objects.create_user(
+            email='p@t.com', username='p', password='pass12345',
+        )
+        self.project = Project.objects.create(name='Prune Project', created_by=self.user)
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.repo = Repository.objects.create(
+            project=self.project,
+            git_url='https://github.com/user/repo.git',
+            git_branch='main',
+            local_path=self.tmpdir.name,
+        )
+
+    def tearDown(self):
+        self.tmpdir.cleanup()
+
+    @patch('repositories.tasks.generate_embeddings_task.delay')
+    def test_prunes_stale_files(self, _mock_embed):
+        path = __import__('pathlib').Path(self.tmpdir.name)
+        (path / 'a.py').write_text('x = 1\n')
+        (path / 'b.py').write_text('y = 2\n')
+
+        stale = IndexedFile.objects.create(
+            repository=self.repo, file_path='gone.py', language='python', file_hash='old',
+        )
+        keep = IndexedFile.objects.create(
+            repository=self.repo, file_path='a.py', language='python', file_hash='old',
+        )
+
+        from repositories.tasks import index_repository_task
+        index_repository_task(str(self.repo.id))
+
+        self.assertFalse(IndexedFile.objects.filter(id=stale.id).exists())
+        self.assertTrue(IndexedFile.objects.filter(id=keep.id).exists())
+        self.assertEqual(IndexedFile.objects.filter(repository=self.repo).count(), 2)
+
+
+class DailyPullTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email='d@t.com', username='d', password='pass12345',
+        )
+        self.project = Project.objects.create(name='Daily Project', created_by=self.user)
+        self.repo = _make_repo(self.project, auto_pull=True)
+        self.off = _make_repo(self.project, auto_pull=False)
+        self.busy = _make_repo(
+            self.project, auto_pull=True, status=Repository.Status.INDEXING,
+        )
+
+    @patch('repositories.tasks.index_repository_task')
+    @patch('repositories.services.GitService.clone_or_pull')
+    def test_only_pulls_auto_pull_and_not_busy(self, mock_clone, mock_index):
+        mock_clone.return_value = __import__('pathlib').Path('/tmp/repo')
+
+        from repositories.tasks import run_daily_pulls
+        run_daily_pulls()
+
+        self.assertEqual(mock_clone.call_count, 1)
+        self.assertEqual(mock_index.call_count, 1)
+        self.repo.refresh_from_db()
+        self.assertEqual(self.repo.status, Repository.Status.INDEXING)
+
+    @patch('repositories.tasks.index_repository_task')
+    @patch('repositories.services.GitService.clone_or_pull')
+    def test_pull_failure_sets_error(self, mock_clone, _mock_index):
+        mock_clone.side_effect = Exception('pull failed')
+
+        from repositories.tasks import run_daily_pulls
+        run_daily_pulls()
+
+        self.repo.refresh_from_db()
+        self.assertEqual(self.repo.status, Repository.Status.ERROR)
+        self.assertIn('pull failed', self.repo.error_message)

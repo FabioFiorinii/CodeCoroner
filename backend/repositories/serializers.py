@@ -38,7 +38,7 @@ class RepositorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Repository
         fields = [
-            'id', 'git_url', 'git_branch',
+            'id', 'git_url', 'git_branch', 'auto_pull',
             'status', 'file_count', 'total_bytes', 'error_message', 'last_indexed_at',
             'assigned_projects', 'groups', 'created_at', 'updated_at',
         ]
