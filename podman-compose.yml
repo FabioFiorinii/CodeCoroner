@@ -120,6 +120,12 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
   daphne:
     build:
@@ -227,6 +233,12 @@ services:
     restart: unless-stopped
     ports:
       - "8002:8002"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
   nginx:
     image: docker.io/nginx:alpine

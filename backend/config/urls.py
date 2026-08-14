@@ -1,7 +1,9 @@
-from django.contrib import admin
-from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.contrib import admin
+from django.urls import include, path
+
+from common.views import HealthView
 
 api_v1_patterns = [
     path('auth/', include('accounts.urls')),
@@ -11,6 +13,7 @@ api_v1_patterns = [
     path('reports/', include('reports.urls')),
     path('webhooks/', include('webhooks.urls')),
     path('dashboard/', include('dashboard.urls')),
+    path('health/', HealthView.as_view(), name='health'),
 ]
 
 urlpatterns = [

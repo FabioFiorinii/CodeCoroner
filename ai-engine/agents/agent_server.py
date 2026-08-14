@@ -45,19 +45,25 @@ async def installed_models():
 
 
 async def resolve_model(requested: str | None, default: str) -> str:
-    if not requested:
-        return default
+    candidates = list(dict.fromkeys(
+        filter(None, [requested, default, settings.llm_model, settings.rca_model])
+    ))
     try:
         installed = await installed_models()
-        if requested in installed:
-            return requested
-        logger.warning(
-            'Model %s is not installed, falling back to %s', requested, default
-        )
-        return default
     except Exception:
-        logger.warning('Could not check installed models, using requested %s', requested)
-        return requested
+        logger.warning('Could not check installed models, using %s', candidates[0])
+        return candidates[0]
+    for model in candidates:
+        if model in installed:
+            return model
+    if installed:
+        chosen = sorted(installed)[0]
+        logger.warning(
+            'None of %s installed; using first installed model %s', candidates, chosen
+        )
+        return chosen
+    logger.warning('No models installed, using %s', candidates[0])
+    return candidates[0]
 
 
 class EmbedRequest(BaseModel):

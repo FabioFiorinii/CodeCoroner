@@ -1,5 +1,6 @@
 import httpx
 from django.conf import settings
+from django.db import connection
 from rest_framework import permissions, serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -22,6 +23,30 @@ def _error_detail(resp):
         return resp.json().get('detail', '')
     except Exception:
         return ''
+
+
+class HealthView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, _request):
+        db_ok = True
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute('SELECT 1')
+        except Exception:
+            db_ok = False
+        ai_ok = False
+        try:
+            resp = httpx.get(f'{AI_ENGINE_URL}/health', timeout=5)
+            ai_ok = resp.status_code == 200
+        except Exception:
+            ai_ok = False
+        status = 'healthy' if (db_ok and ai_ok) else 'degraded'
+        return Response({
+            'status': status,
+            'database': db_ok,
+            'ai_engine': ai_ok,
+        })
 
 
 class ModelSettingsSerializer(serializers.Serializer):
