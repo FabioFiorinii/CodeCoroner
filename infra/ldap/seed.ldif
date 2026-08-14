@@ -1,0 +1,46 @@
+dn: dc=codecoroner,dc=dev
+objectClass: top
+objectClass: dcObject
+objectClass: organization
+o: CodeCoroner
+dc: codecoroner
+
+dn: ou=people,dc=codecoroner,dc=dev
+objectClass: organizationalUnit
+ou: people
+
+dn: cn=ldap-users,dc=codecoroner,dc=dev
+objectClass: groupOfNames
+cn: ldap-users
+member: uid=alice,ou=people,dc=codecoroner,dc=dev
+
+dn: cn=ldap-admins,dc=codecoroner,dc=dev
+objectClass: groupOfNames
+cn: ldap-admins
+member: uid=bob,ou=people,dc=codecoroner,dc=dev
+
+dn: uid=alice,ou=people,dc=codecoroner,dc=dev
+objectClass: inetOrgPerson
+objectClass: posixAccount
+cn: Alice Developer
+sn: Developer
+givenName: Alice
+uid: alice
+mail: alice@codecoroner.dev
+userPassword: alicepass123
+uidNumber: 2001
+gidNumber: 2001
+homeDirectory: /home/alice
+
+dn: uid=bob,ou=people,dc=codecoroner,dc=dev
+objectClass: inetOrgPerson
+objectClass: posixAccount
+cn: Bob Admin
+sn: Admin
+givenName: Bob
+uid: bob
+mail: bob@codecoroner.dev
+userPassword: bobpass123
+uidNumber: 2002
+gidNumber: 2002
+homeDirectory: /home/bob

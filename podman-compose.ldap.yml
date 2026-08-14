@@ -1,0 +1,25 @@
+version: "3.9"
+
+services:
+  ldap:
+    build:
+      context: ./infra/ldap
+      dockerfile: Dockerfile
+    container_name: codecoroner-ldap
+    networks:
+      - codecoroner_net
+    restart: unless-stopped
+    ports:
+      - "3890:3890"
+
+  django:
+    environment:
+      LDAP_SERVER_URI: ldap://ldap:3890
+      LDAP_BIND_DN: cn=admin,dc=codecoroner,dc=dev
+      LDAP_BIND_PASSWORD: adminpass123
+      LDAP_BASE_DN: dc=codecoroner,dc=dev
+      LDAP_STAFF_GROUP: cn=ldap-users,dc=codecoroner,dc=dev
+      LDAP_SUPERUSER_GROUP: cn=ldap-admins,dc=codecoroner,dc=dev
+      LDAP_GROUP_MAP: '{"default": "ldap-users", "ldap": "ldap-users"}'
+    depends_on:
+      - ldap

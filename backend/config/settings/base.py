@@ -1,3 +1,4 @@
+import json
 import os
 from pathlib import Path
 from datetime import timedelta
@@ -157,6 +158,44 @@ AI_ENGINE_URL = os.environ.get('AI_ENGINE_URL', 'http://ai-engine:8002')
 
 AUTO_PULL_HOUR = int(os.environ.get('AUTO_PULL_HOUR', '3'))
 AUTO_PULL_MINUTE = int(os.environ.get('AUTO_PULL_MINUTE', '0'))
+
+LDAP_GROUP_MAP = json.loads(os.environ.get('LDAP_GROUP_MAP', '{}'))
+
+if os.environ.get('LDAP_SERVER_URI'):
+    import ldap
+    from django_auth_ldap.config import GroupOfNamesType, LDAPSearch
+
+    AUTHENTICATION_BACKENDS = [
+        'django_auth_ldap.backend.LDAPBackend',
+        'django.contrib.auth.backends.ModelBackend',
+    ]
+    AUTH_LDAP_SERVER_URI = os.environ['LDAP_SERVER_URI']
+    AUTH_LDAP_BIND_DN = os.environ.get('LDAP_BIND_DN')
+    AUTH_LDAP_BIND_PASSWORD = os.environ.get('LDAP_BIND_PASSWORD')
+    AUTH_LDAP_USER_SEARCH = LDAPSearch(
+        os.environ.get('LDAP_BASE_DN', 'dc=codecoroner,dc=dev'),
+        ldap.SCOPE_SUBTREE,
+        '(mail=%(user)s)',
+    )
+    AUTH_LDAP_GROUP_SEARCH = LDAPSearch(
+        os.environ.get('LDAP_BASE_DN', 'dc=codecoroner,dc=dev'),
+        ldap.SCOPE_SUBTREE,
+        '(objectClass=groupOfNames)',
+    )
+    AUTH_LDAP_GROUP_TYPE = GroupOfNamesType()
+    AUTH_LDAP_USER_ATTR_MAP = {
+        'username': 'uid',
+        'first_name': 'givenName',
+        'last_name': 'sn',
+        'email': 'mail',
+    }
+    AUTH_LDAP_ALWAYS_UPDATE_USER = True
+    user_flags = {}
+    if os.environ.get('LDAP_STAFF_GROUP'):
+        user_flags['is_staff'] = os.environ['LDAP_STAFF_GROUP']
+    if os.environ.get('LDAP_SUPERUSER_GROUP'):
+        user_flags['is_superuser'] = os.environ['LDAP_SUPERUSER_GROUP']
+    AUTH_LDAP_USER_FLAGS_BY_GROUP = user_flags
 
 MODEL_TIERS = {
     'fast': {
