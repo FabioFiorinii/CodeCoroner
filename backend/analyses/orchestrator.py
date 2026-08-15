@@ -11,6 +11,7 @@ from pgvector.django import CosineDistance
 
 from .models import Analysis, AnalysisRun, BugLocalization, SuspiciousFileScore, RootCause, FixSuggestion, Report
 from repositories.models import ChunkEmbedding, CodeChunk
+from webhooks.services import dispatch
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +97,13 @@ class AnalysisOrchestrator:
             self._update_status(Analysis.Status.COMPLETED)
             self.current_step = None
             self._record_run('completed', status='completed')
+            dispatch(self.analysis.project_id, 'analysis.completed', {
+                'id': str(self.analysis.id),
+                'title': self.analysis.title,
+                'status': self.analysis.status,
+                'project': str(self.analysis.project_id),
+                'duration_seconds': int(time.time() - start_time),
+            })
 
         except Exception as e:
             logger.exception(f'Analysis {self.analysis.id} failed')
@@ -105,6 +113,13 @@ class AnalysisOrchestrator:
             with transaction.atomic():
                 self.analysis.save(update_fields=['status', 'error_message'])
             self._record_run('failed', status='failed', error=str(e))
+            dispatch(self.analysis.project_id, 'analysis.failed', {
+                'id': str(self.analysis.id),
+                'title': self.analysis.title,
+                'status': self.analysis.status,
+                'project': str(self.analysis.project_id),
+                'error': str(e),
+            })
         finally:
             self.analysis.duration_seconds = int(time.time() - start_time)
             self.analysis.save(update_fields=['duration_seconds'])

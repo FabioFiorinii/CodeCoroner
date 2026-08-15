@@ -222,6 +222,15 @@ def _finish_index(repo: Repository):
     repo.status = Repository.Status.INDEXED
     repo.last_indexed_at = timezone.now()
     repo.save(update_fields=['status', 'last_indexed_at'])
+    from webhooks.services import dispatch
+
+    dispatch(repo.project_id, 'repository.indexed', {
+        'id': str(repo.id),
+        'git_url': repo.git_url,
+        'status': repo.status,
+        'project': str(repo.project_id),
+        'file_count': repo.file_count,
+    })
 
 
 def _call_embed_api(texts: list[str]) -> list[list[float]]:

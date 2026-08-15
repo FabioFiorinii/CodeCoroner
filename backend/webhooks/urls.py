@@ -1,3 +1,8 @@
-from django.urls import path
+from rest_framework.routers import DefaultRouter
 
-urlpatterns = []
+from .views import WebhookViewSet
+
+router = DefaultRouter()
+router.register('', WebhookViewSet, basename='webhook')
+
+urlpatterns = router.urls

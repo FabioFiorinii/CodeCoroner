@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, Clock, CheckCircle2, AlertCircle, Loader2,
@@ -10,6 +10,7 @@ import {
   useCreateAnalysis, useProjectAssignedRepos,
 } from '../lib/queries'
 import { AnalysisForm } from '../components/AnalysisForm'
+import { toast } from '../lib/toast'
 import { useAuthStore } from '../stores/authStore'
 import { Card } from '../components/common/Card'
 import { Button } from '../components/common/Button'
@@ -56,6 +57,26 @@ export function AnalysisDetailPage() {
   const rootId = analysis?.parent_analysis ?? analysis?.id
   const { data: thread } = useAnalysisThread(rootId)
   const { data: projectRepos } = useProjectAssignedRepos(projectId)
+
+  const prevStatus = useRef<string | null>(null)
+  useEffect(() => {
+    const current = analysis?.status
+    if (!current) return
+    const prev = prevStatus.current
+    if (prev && prev !== current && (current === 'completed' || current === 'failed')) {
+      toast(
+        current === 'completed'
+          ? `Analysis "${analysis.title}" completed`
+          : `Analysis "${analysis.title}" failed`,
+        {
+          type: current === 'completed' ? 'success' : 'error',
+          href: `/projects/${projectId}/analyses/${analysis.id}`,
+          linkText: current === 'completed' ? 'Open analysis' : 'View details',
+        },
+      )
+    }
+    prevStatus.current = current
+  }, [analysis])
 
   if (isLoading) {
     return (

@@ -3,6 +3,7 @@ import { ArrowLeft, Trash2, Edit3, Users, GitBranch, Clock, ChevronRight, Bug } 
 import { useProject, useDeleteProject } from '../lib/queries'
 import { Card } from '../components/common/Card'
 import { Button } from '../components/common/Button'
+import { WebhooksCard } from '../components/project/WebhooksCard'
 
 export function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -128,6 +129,8 @@ export function ProjectDetailPage() {
           </div>
         </Card>
       </Link>
+
+      <WebhooksCard projectId={id!} />
 
     </div>
   )

@@ -75,6 +75,14 @@ class AnalysisViewSet(viewsets.ModelViewSet):
         from .tasks import run_analysis_pipeline
 
         run_analysis_pipeline.delay(str(analysis.id))
+        from webhooks.services import dispatch
+
+        dispatch(analysis.project_id, 'analysis.created', {
+            'id': str(analysis.id),
+            'title': analysis.title,
+            'status': analysis.status,
+            'project': str(analysis.project_id),
+        })
         out = AnalysisSerializer(analysis, context=self.get_serializer_context())
         return Response(out.data, status=status.HTTP_201_CREATED)
 
