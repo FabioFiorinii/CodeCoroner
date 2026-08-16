@@ -1,7 +1,9 @@
-from django.db.models import Count, Q
+from django.db.models import Count, OuterRef, Q, Subquery
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+
+from common.pagination import StandardPagination
 
 from .models import Analysis
 from .serializers import (
@@ -16,8 +18,13 @@ from .serializers import (
 )
 
 
+class AnalysisPagination(StandardPagination):
+    page_size = 10
+
+
 class AnalysisViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = AnalysisPagination
 
     def get_serializer_class(self):
         if self.action == 'create':
@@ -35,6 +42,13 @@ class AnalysisViewSet(viewsets.ModelViewSet):
         if self.action == 'list':
             qs = qs.filter(parent_analysis__isnull=True)
         qs = qs.annotate(children_count=Count('children', distinct=True))
+        latest = Analysis.objects.filter(
+            Q(id=OuterRef('id')) | Q(parent_analysis_id=OuterRef('id'))
+        ).order_by('-created_at')
+        qs = qs.annotate(
+            latest_status=Subquery(latest.values('status')[:1]),
+            latest_error_message=Subquery(latest.values('error_message')[:1]),
+        )
         return (
             qs.distinct()
             .select_related('project', 'repository')
@@ -47,6 +61,7 @@ class AnalysisViewSet(viewsets.ModelViewSet):
                 'report',
             )
             .distinct()
+            .order_by('-created_at')
         )
 
     def _thread(self, analysis):

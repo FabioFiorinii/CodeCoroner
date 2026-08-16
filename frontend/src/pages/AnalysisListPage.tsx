@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Plus, Bug, ArrowLeft, Clock, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, Bug, ArrowLeft, Clock, Trash2, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useAnalyses, useDeleteAnalysis } from '../lib/queries'
 import type { AnalysisItem } from '../lib/queries'
 import { api } from '../lib/api'
@@ -12,7 +12,8 @@ import { useAuthStore } from '../stores/authStore'
 export function AnalysisListPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const { user } = useAuthStore()
-  const { data, isLoading } = useAnalyses(projectId)
+  const [page, setPage] = useState(1)
+  const { data, isLoading } = useAnalyses(projectId, page)
   const deleteAnalysis = useDeleteAnalysis()
   const [search, setSearch] = useState('')
   const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set())
@@ -60,7 +61,7 @@ export function AnalysisListPage() {
               Analyses
             </h1>
             <p className="text-text-secondary mt-1">
-              {data?.results?.length ?? 0} total
+              {data?.count ?? 0} total
             </p>
           </div>
           <Link to={`/projects/${projectId}/analyses/new`}>
@@ -110,7 +111,7 @@ export function AnalysisListPage() {
 
       <div className="space-y-3">
         {analyses?.map((a) => {
-          const StatusIcon = STATUS_ICON[a.status] || Clock
+          const StatusIcon = STATUS_ICON[a.latest_status || a.status] || Clock
           const isExpanded = expandedThreads.has(a.id)
           return (
             <div key={a.id}>
@@ -136,14 +137,14 @@ export function AnalysisListPage() {
                             {a.children_count} retr{a.children_count === 1 ? 'y' : 'ies'}
                           </span>
                         )}
-                        <div className={`flex items-center gap-1.5 text-sm px-3 py-1 rounded-full border ${STATUS_COLOR[a.status] || 'border-gray-200'}`}>
-                          <StatusIcon className={`w-4 h-4 ${isBusy(a.status) ? 'animate-spin' : ''}`} />
-                          <span className="capitalize">{a.status}</span>
+                        <div className={`flex items-center gap-1.5 text-sm px-3 py-1 rounded-full border ${STATUS_COLOR[a.latest_status || a.status] || 'border-gray-200'}`}>
+                          <StatusIcon className={`w-4 h-4 ${isBusy(a.latest_status || a.status) ? 'animate-spin' : ''}`} />
+                          <span className="capitalize">{a.latest_status || a.status}</span>
                         </div>
                       </div>
                     </div>
-                    {a.error_message && (
-                      <p className="text-sm text-red-500 mt-2">{a.error_message}</p>
+                    {(a.latest_error_message || a.error_message) && (
+                      <p className="text-sm text-red-500 mt-2">{a.latest_error_message || a.error_message}</p>
                     )}
                   </Card>
                 </Link>
@@ -214,6 +215,30 @@ export function AnalysisListPage() {
           )
         })}
       </div>
+
+      {data && data.count > 0 && (
+        <div className="flex items-center justify-center gap-4 mt-6">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={!data.previous}
+            className="flex items-center gap-1 px-3 py-1.5 rounded border border-border text-sm text-text-secondary hover:bg-surface-alt disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Prev
+          </button>
+          <span className="text-sm text-text-muted">
+            Page {page} of {Math.max(1, Math.ceil(data.count / 10))}
+          </span>
+          <button
+            onClick={() => setPage((p) => p + 1)}
+            disabled={!data.next}
+            className="flex items-center gap-1 px-3 py-1.5 rounded border border-border text-sm text-text-secondary hover:bg-surface-alt disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            Next
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
     </div>
   )
 }

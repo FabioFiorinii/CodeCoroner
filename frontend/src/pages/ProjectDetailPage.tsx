@@ -1,5 +1,5 @@
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, Trash2, Edit3, Users, GitBranch, Clock, ChevronRight, Bug } from 'lucide-react'
+import { ArrowLeft, Trash2, Edit3, GitBranch, Clock, ChevronRight, Bug } from 'lucide-react'
 import { useProject, useDeleteProject } from '../lib/queries'
 import { Card } from '../components/common/Card'
 import { Button } from '../components/common/Button'
@@ -74,9 +74,9 @@ export function ProjectDetailPage() {
 
       <div className="grid grid-cols-3 gap-4">
         <Card padding="sm" className="text-center">
-          <Users className="w-5 h-5 text-primary mx-auto mb-1" />
-          <p className="text-lg font-semibold">{project.member_count}</p>
-          <p className="text-xs text-text-muted">Members</p>
+          <Bug className="w-5 h-5 text-primary mx-auto mb-1" />
+          <p className="text-lg font-semibold">{project.analyses_count ?? 0}</p>
+          <p className="text-xs text-text-muted">Analyses</p>
         </Card>
         <Card padding="sm" className="text-center">
           <GitBranch className="w-5 h-5 text-primary mx-auto mb-1" />
@@ -121,7 +121,7 @@ export function ProjectDetailPage() {
                   Repositories
                 </h3>
                 <p className="text-sm text-text-muted">
-                  {project.repo_count} repository{project.repo_count !== 1 ? 'ies' : 'y'}
+                  {project.repo_count} {project.repo_count === 1 ? 'repository' : 'repositories'}
                 </p>
               </div>
             </div>

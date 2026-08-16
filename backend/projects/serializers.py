@@ -15,6 +15,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     memberships = ProjectMembershipSerializer(many=True, read_only=True)
     member_count = serializers.SerializerMethodField()
     repo_count = serializers.SerializerMethodField()
+    analyses_count = serializers.SerializerMethodField()
     groups = serializers.SlugRelatedField(
         many=True, slug_field='name', queryset=Group.objects.all(), required=False,
     )
@@ -23,7 +24,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         model = Project
         fields = [
             'id', 'name', 'description', 'created_by', 'created_at', 'updated_at',
-            'memberships', 'member_count', 'repo_count', 'groups',
+            'memberships', 'member_count', 'repo_count', 'analyses_count', 'groups',
         ]
         read_only_fields = ['id', 'created_by', 'created_at', 'updated_at']
 
@@ -32,6 +33,9 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def get_repo_count(self, obj):
         return obj.assigned_repositories.count()
+
+    def get_analyses_count(self, obj):
+        return obj.analyses.count()
 
     def create(self, validated_data):
         groups_data = validated_data.pop('groups', None)

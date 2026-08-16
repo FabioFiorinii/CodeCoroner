@@ -101,6 +101,8 @@ class AnalysisSerializer(serializers.ModelSerializer):
     user_email = serializers.EmailField(source='user.email', read_only=True)
     user_username = serializers.CharField(source='user.username', read_only=True)
     children_count = serializers.IntegerField(read_only=True, default=0)
+    latest_status = serializers.CharField(read_only=True, allow_blank=True)
+    latest_error_message = serializers.CharField(read_only=True, allow_blank=True)
 
     class Meta:
         model = Analysis
@@ -127,6 +129,8 @@ class AnalysisSerializer(serializers.ModelSerializer):
             'fix_suggestion',
             'report',
             'children_count',
+            'latest_status',
+            'latest_error_message',
         ]
         read_only_fields = [
             'id',
@@ -144,6 +148,8 @@ class AnalysisSerializer(serializers.ModelSerializer):
             'fix_suggestion',
             'report',
             'children_count',
+            'latest_status',
+            'latest_error_message',
         ]
 
 

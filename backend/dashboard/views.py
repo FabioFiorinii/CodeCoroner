@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 from rest_framework import permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -17,7 +18,10 @@ class DashboardView(APIView):
         if user.is_superuser:
             analyses = Analysis.objects.all()
         else:
-            analyses = Analysis.objects.filter(user__groups__in=group_ids)
+            analyses = Analysis.objects.filter(
+                Q(project__memberships__user=user) | Q(project__groups__in=group_ids)
+            )
+        analyses = analyses.filter(parent_analysis__isnull=True)
 
         recent = analyses.select_related('project').order_by('-created_at').distinct()[:5]
         recent_analyses = [

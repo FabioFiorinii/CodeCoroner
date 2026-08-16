@@ -97,8 +97,8 @@ export function AnalysisDetailPage() {
     return (
       <Card padding="lg" className="max-w-3xl mx-auto text-center">
         <p className="text-red-500 font-medium">Analysis not found</p>
-        <Button variant="ghost" className="mt-4" onClick={() => navigate(`/projects/${projectId}/analyses`)}>
-          Back to Analyses
+        <Button variant="ghost" className="mt-4" onClick={() => navigate('/projects')}>
+          Back to Projects
         </Button>
       </Card>
     )
@@ -155,15 +155,16 @@ export function AnalysisDetailPage() {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <Button
-              variant="secondary"
+              variant="primary"
               size="sm"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
               onClick={() => {
                 setRetryError(null)
                 setShowRetryModal(true)
               }}
             >
               <Plus className="w-4 h-4" />
-              + Analysis
+              Retry Analysis
             </Button>
             {user?.is_superuser && (
               <>

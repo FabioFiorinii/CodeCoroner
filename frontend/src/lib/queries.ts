@@ -10,6 +10,7 @@ export interface Project {
   updated_at: string
   member_count: number
   repo_count: number
+  analyses_count: number
 }
 
 export interface ProjectInput {
@@ -293,6 +294,8 @@ export interface AnalysisItem {
     format: string
     created_at: string
   } | null
+  latest_status: string
+  latest_error_message: string
 }
 
 export interface AnalysisInput {
@@ -304,10 +307,17 @@ export interface AnalysisInput {
   parent_analysis?: string
 }
 
-export function useAnalyses(projectId: string | undefined) {
-  return useQuery<{ results: AnalysisItem[] }>({
-    queryKey: [ANALYSES_KEY, { project: projectId }],
-    queryFn: () => api.get(`/analyses/?project=${projectId}`),
+export interface AnalysisPage {
+  count: number
+  next: string | null
+  previous: string | null
+  results: AnalysisItem[]
+}
+
+export function useAnalyses(projectId: string | undefined, page = 1) {
+  return useQuery<AnalysisPage>({
+    queryKey: [ANALYSES_KEY, { project: projectId }, { page }],
+    queryFn: () => api.get(`/analyses/?project=${projectId}&page=${page}`),
     enabled: !!projectId,
   })
 }

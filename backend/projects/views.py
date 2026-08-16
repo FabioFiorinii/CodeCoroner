@@ -22,12 +22,15 @@ class ProjectViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated, IsProjectMember]
 
     def get_queryset(self):
-        qs = Project.objects.filter(
-            Q(created_by=self.request.user) |
-            Q(memberships__user=self.request.user)
-        )
-        if not self.request.user.is_superuser:
-            qs = qs.filter(groups__in=self.request.user.groups.all())
+        user = self.request.user
+        if user.is_superuser:
+            qs = Project.objects.all()
+        else:
+            qs = Project.objects.filter(
+                Q(created_by=user) |
+                Q(memberships__user=user) |
+                Q(groups__in=user.groups.all())
+            )
         return qs.distinct().prefetch_related('memberships__user').order_by('-created_at')
 
     @action(detail=True, methods=['get', 'post'])
