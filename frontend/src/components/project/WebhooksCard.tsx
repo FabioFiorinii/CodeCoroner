@@ -3,6 +3,7 @@ import { Link2, Plus, Send, Trash2, Power, X } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import { api } from '../../lib/api'
 import { toast } from '../../lib/toast'
+import { confirmDialog } from '../../lib/confirm'
 import { Card } from '../common/Card'
 import { Button } from '../common/Button'
 
@@ -85,7 +86,13 @@ export function WebhooksCard({ projectId }: { projectId: string }) {
   }
 
   const handleDelete = async (webhook: WebhookItem) => {
-    if (!window.confirm(`Delete webhook ${webhook.url}?`)) return
+    const ok = await confirmDialog({
+      title: 'Delete webhook?',
+      message: webhook.url,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
     try {
       await api.delete(`/webhooks/${webhook.id}/`)
       toast('Webhook deleted', { type: 'success' })

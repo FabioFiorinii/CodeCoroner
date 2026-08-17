@@ -12,6 +12,7 @@ import {
 } from '../lib/queries'
 import { Card } from '../components/common/Card'
 import { Button } from '../components/common/Button'
+import { confirmDialog } from '../lib/confirm'
 
 const STATUS_ICON: Record<string, typeof AlertCircle> = {
   pending: Clock,
@@ -42,7 +43,13 @@ export function RepositoryDetailPage() {
   const [showChunks, setShowChunks] = useState(false)
 
   const handleDelete = async () => {
-    if (!window.confirm('Delete this repository permanently? Indexed data will be lost.')) return
+    const ok = await confirmDialog({
+      title: 'Delete repository permanently?',
+      message: 'The clone and all indexed data will be lost.',
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
     try {
       await deleteRepo.mutateAsync(repoId!)
       navigate('/repositories')

@@ -11,6 +11,7 @@ import {
 } from '../lib/queries'
 import { AnalysisForm } from '../components/AnalysisForm'
 import { toast } from '../lib/toast'
+import { confirmDialog } from '../lib/confirm'
 import { useAuthStore } from '../stores/authStore'
 import { Card } from '../components/common/Card'
 import { Button } from '../components/common/Button'
@@ -172,12 +173,17 @@ export function AnalysisDetailPage() {
                   variant="ghost"
                   size="sm"
                   className="text-red-500 hover:text-red-600 hover:bg-red-50 shrink-0"
-                  onClick={() => {
-                    if (confirm('Delete this analysis? This cannot be undone.')) {
-                      deleteAnalysis.mutate(analysis.id, {
-                        onSuccess: () => navigate(`/projects/${projectId}/analyses`),
-                      })
-                    }
+                  onClick={async () => {
+                    const ok = await confirmDialog({
+                      title: 'Delete analysis?',
+                      message: 'This cannot be undone.',
+                      confirmLabel: 'Delete',
+                      danger: true,
+                    })
+                    if (!ok) return
+                    deleteAnalysis.mutate(analysis.id, {
+                      onSuccess: () => navigate(`/projects/${projectId}/analyses`),
+                    })
                   }}
                 >
                   <Trash2 className="w-4 h-4" />
@@ -187,12 +193,17 @@ export function AnalysisDetailPage() {
                   variant="ghost"
                   size="sm"
                   className="text-red-600 hover:text-red-700 hover:bg-red-50 shrink-0"
-                  onClick={() => {
-                    if (confirm('Delete this bug thread and all its analyses? This cannot be undone.')) {
-                      deleteThread.mutate(rootId!, {
-                        onSuccess: () => navigate(`/projects/${projectId}/analyses`),
-                      })
-                    }
+                  onClick={async () => {
+                    const ok = await confirmDialog({
+                      title: 'Delete bug thread?',
+                      message: 'This will delete the thread and all its analyses. This cannot be undone.',
+                      confirmLabel: 'Delete All',
+                      danger: true,
+                    })
+                    if (!ok) return
+                    deleteThread.mutate(rootId!, {
+                      onSuccess: () => navigate(`/projects/${projectId}/analyses`),
+                    })
                   }}
                 >
                   <Trash2 className="w-4 h-4" />

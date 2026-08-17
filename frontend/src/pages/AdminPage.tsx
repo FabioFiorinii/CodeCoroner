@@ -5,6 +5,7 @@ import { Card } from '../components/common/Card'
 import { Button } from '../components/common/Button'
 import { useAuthStore } from '../stores/authStore'
 import { api, ApiError } from '../lib/api'
+import { confirmDialog } from '../lib/confirm'
 
 interface AdminUser {
   id: number
@@ -96,7 +97,13 @@ export function AdminPage() {
   )
 
   const handleDeleteUser = async (userId: number, userEmail: string) => {
-    if (!confirm(`Delete user ${userEmail}? This cannot be undone.`)) return
+    const ok = await confirmDialog({
+      title: 'Delete user?',
+      message: `Delete ${userEmail}? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
     try {
       await api.delete(`/auth/admin/users/${userId}/`)
       loadData()
@@ -131,7 +138,13 @@ export function AdminPage() {
   }
 
   const handleDeleteGroup = async (groupId: number, groupName: string) => {
-    if (!confirm(`Delete group "${groupName}"?`)) return
+    const ok = await confirmDialog({
+      title: 'Delete group?',
+      message: `Delete group "${groupName}"?`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
     try {
       await api.delete(`/auth/admin/groups/${groupId}/`)
       loadData()

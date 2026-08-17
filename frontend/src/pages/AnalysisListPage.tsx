@@ -4,6 +4,7 @@ import { Plus, Bug, ArrowLeft, Clock, Trash2, ChevronDown, ChevronUp, ChevronLef
 import { useAnalyses, useDeleteAnalysis } from '../lib/queries'
 import type { AnalysisItem } from '../lib/queries'
 import { api } from '../lib/api'
+import { confirmDialog } from '../lib/confirm'
 import { STATUS_ICON, STATUS_COLOR, isBusy } from '../lib/analysisStatus'
 import { Card } from '../components/common/Card'
 import { Button } from '../components/common/Button'
@@ -150,10 +151,15 @@ export function AnalysisListPage() {
                 </Link>
                 {user?.is_superuser && (
                   <button
-                    onClick={() => {
-                      if (confirm(`Delete "${a.title || 'Untitled Analysis'}"?`)) {
-                        deleteAnalysis.mutate(a.id)
-                      }
+                    onClick={async () => {
+                      const ok = await confirmDialog({
+                        title: 'Delete analysis?',
+                        message: `Delete "${a.title || 'Untitled Analysis'}"? This cannot be undone.`,
+                        confirmLabel: 'Delete',
+                        danger: true,
+                      })
+                      if (!ok) return
+                      deleteAnalysis.mutate(a.id)
                     }}
                     className="self-center p-2 text-text-muted hover:text-red-500 transition-colors shrink-0"
                     title="Delete analysis"

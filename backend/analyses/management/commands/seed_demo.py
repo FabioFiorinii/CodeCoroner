@@ -11,9 +11,9 @@ from analyses.models import Analysis, AnalysisRun, BugLocalization, SuspiciousFi
 User = get_user_model()
 
 DEMO_USER = {
-    'email': 'demo@codecoroner.dev',
-    'username': 'demo',
-    'password': 'demodemo',
+    'email': 'admin@codecoroner.dev',
+    'username': 'admin',
+    'password': 'adminadmin',
 }
 
 FIXED_NOW = timezone.now() - timedelta(hours=2)

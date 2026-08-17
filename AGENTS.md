@@ -19,7 +19,7 @@ podman-compose up -d --build   # full stack
 make test                      # pytest inside django container
 make lint                      # ruff check + mypy inside django container
 podman-compose exec django pytest <path>::<test>   # single test
-make seed                      # demo data (demo@codecoroner.dev / demodemo)
+make seed                      # demo data (admin@codecoroner.dev / adminadmin)
 ```
 
 - Frontend: `npm run lint` (eslint), `npm run typecheck` (`tsc --noEmit`), `npm run build` (`tsc -b && vite build`). Vite dev server runs on 5173 proxying `/api` and `/ws` to `:8000`. **Vitest is installed but no test script is configured** — frontend tests effectively don't run.

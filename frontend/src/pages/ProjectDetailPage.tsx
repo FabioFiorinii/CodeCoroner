@@ -1,6 +1,7 @@
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft, Trash2, Edit3, GitBranch, Clock, ChevronRight, Bug } from 'lucide-react'
 import { useProject, useDeleteProject } from '../lib/queries'
+import { confirmDialog } from '../lib/confirm'
 import { Card } from '../components/common/Card'
 import { Button } from '../components/common/Button'
 import { WebhooksCard } from '../components/project/WebhooksCard'
@@ -12,7 +13,13 @@ export function ProjectDetailPage() {
   const deleteProject = useDeleteProject()
 
   const handleDelete = async () => {
-    if (!window.confirm('Delete this project permanently?')) return
+    const ok = await confirmDialog({
+      title: 'Delete project permanently?',
+      message: 'This will remove the project, its analyses and webhooks.',
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
     await deleteProject.mutateAsync(id!)
     navigate('/projects', { replace: true })
   }
