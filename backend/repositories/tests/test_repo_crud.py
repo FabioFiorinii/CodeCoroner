@@ -147,6 +147,30 @@ class RepoCrudTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data['results']), 2)
 
+    def test_14_admin_retrieves_repo_of_other_group(self):
+        admin = User.objects.create_superuser(
+            email='adm@t.com', username='adm', password='pass12345',
+        )
+        p2 = Project.objects.create(name='P2', created_by=self.other)
+        ProjectMembership.objects.create(project=p2, user=self.other, role='owner')
+        repo = Repository.objects.create(project=p2, git_url='https://github.com/secret/repo.git')
+        self.client.force_authenticate(user=admin)
+        response = self.client.get(self._detail_url(repo.id))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(str(response.data['id']), str(repo.id))
+
+    def test_15_admin_can_action_repo_of_other_group(self):
+        admin = User.objects.create_superuser(
+            email='adm@t.com', username='adm', password='pass12345',
+        )
+        p2 = Project.objects.create(name='P2', created_by=self.other)
+        ProjectMembership.objects.create(project=p2, user=self.other, role='owner')
+        repo = Repository.objects.create(project=p2, git_url='https://github.com/secret/repo.git')
+        self.client.force_authenticate(user=admin)
+        response = self.client.get(f'/api/v1/repositories/{repo.id}/status/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['status'], 'pending')
+
 
 class RepoActionTests(TestCase):
     """Tests for custom actions: index, reindex, status, files, chunks."""

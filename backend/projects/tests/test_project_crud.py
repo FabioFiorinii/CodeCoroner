@@ -1,7 +1,8 @@
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
-from django.contrib.auth import get_user_model
+
 from projects.models import Project, ProjectMembership
 
 User = get_user_model()
@@ -96,3 +97,27 @@ class ProjectCrudTests(TestCase):
         self.client.force_authenticate(user=None)
         response = self.client.get(self.list_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_10_admin_sees_all_projects(self):
+        admin = User.objects.create_superuser(
+            email='admin@t.com', username='admin', password='pass12345',
+        )
+        self.client.force_authenticate(user=admin)
+        Project.objects.create(name='P1', created_by=self.user)
+        Project.objects.create(name='P2', created_by=self.other)
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = [p['name'] for p in response.data['results']]
+        self.assertIn('P1', names)
+        self.assertIn('P2', names)
+
+    def test_11_admin_retrieves_project_of_other_group(self):
+        admin = User.objects.create_superuser(
+            email='admin@t.com', username='admin', password='pass12345',
+        )
+        self.client.force_authenticate(user=admin)
+        project = Project.objects.create(name='Others', created_by=self.other)
+        ProjectMembership.objects.create(project=project, user=self.other, role='owner')
+        response = self.client.get(self._detail_url(project.id))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['name'], 'Others')

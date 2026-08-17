@@ -17,7 +17,20 @@ function extractMessage(body: Record<string, unknown>): string {
   if (errors && errors.length > 0) {
     return errors.map((e) => e.detail).join('; ')
   }
-  return (body.detail as string) || (body.message as string) || 'Request failed'
+  if (typeof body.detail === 'string') {
+    return body.detail
+  }
+  if (Array.isArray(body.non_field_errors)) {
+    return (body.non_field_errors as string[]).join('; ')
+  }
+  const firstVal = Object.values(body)[0]
+  if (Array.isArray(firstVal)) {
+    return (firstVal as string[]).join('; ')
+  }
+  if (typeof firstVal === 'string') {
+    return firstVal
+  }
+  return (body.message as string) || 'Request failed'
 }
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {

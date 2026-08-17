@@ -33,9 +33,12 @@ class AnalysisViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        qs = Analysis.objects.filter(
-            Q(project__memberships__user=user) | Q(project__groups__in=user.groups.all())
-        )
+        if user.is_superuser:
+            qs = Analysis.objects.all()
+        else:
+            qs = Analysis.objects.filter(
+                Q(project__memberships__user=user) | Q(project__groups__in=user.groups.all())
+            )
         project_id = self.request.query_params.get('project')
         if project_id:
             qs = qs.filter(project_id=project_id)

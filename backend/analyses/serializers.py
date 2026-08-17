@@ -186,6 +186,23 @@ class AnalysisCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Parent analysis must belong to the same project.')
         return parent
 
+    def validate(self, attrs):
+        repo_ids = set()
+        repository = attrs.get('repository')
+        if repository:
+            repo_ids.add(repository.id)
+        for rid in (attrs.get('repository_ids') or []):
+            repo_ids.add(rid)
+        if repo_ids:
+            repos = Repository.objects.filter(id__in=repo_ids)
+            for repo in repos:
+                if repo.status != Repository.Status.INDEXED:
+                    raise serializers.ValidationError(
+                        f'Repository "{repo.git_url}" is not ready yet (status: {repo.status}). '
+                        'Wait for indexing to complete before starting an analysis.'
+                    )
+        return attrs
+
     def create(self, validated_data):
         parent = validated_data.pop('parent_analysis', None)
         repo_ids = validated_data.pop('repository_ids', None)

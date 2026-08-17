@@ -1,9 +1,11 @@
 from unittest.mock import patch
-from django.test import TestCase
+
 from django.contrib.auth import get_user_model
+from django.test import TestCase
+
 from projects.models import Project, ProjectMembership
-from repositories.models import Repository, IndexedFile, CodeChunk
 from repositories.chunking import SemanticChunker
+from repositories.models import ChunkEmbedding, CodeChunk, IndexedFile, Repository
 
 User = get_user_model()
 
@@ -20,14 +22,18 @@ def _make_repo(project, **kwargs):
 class CloneTaskTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
-            email='test@t.com', username='t', password='pass12345',
+            email='test@t.com',
+            username='t',
+            password='pass12345',
         )
         self.project = Project.objects.create(
             name='Test Project',
             created_by=self.user,
         )
         ProjectMembership.objects.create(
-            project=self.project, user=self.user, role='owner',
+            project=self.project,
+            user=self.user,
+            role='owner',
         )
         self.repo = Repository.objects.create(
             project=self.project,
@@ -40,6 +46,7 @@ class CloneTaskTests(TestCase):
     def test_clone_success(self, mock_index, mock_clone):
         mock_clone.return_value = None
         from repositories.tasks import clone_repository_task
+
         clone_repository_task(str(self.repo.id))
 
         self.repo.refresh_from_db()
@@ -50,6 +57,7 @@ class CloneTaskTests(TestCase):
     def test_clone_failure(self, mock_clone):
         mock_clone.side_effect = Exception('git error')
         from repositories.tasks import clone_repository_task
+
         clone_repository_task(str(self.repo.id))
 
         self.repo.refresh_from_db()
@@ -60,7 +68,7 @@ class CloneTaskTests(TestCase):
 class ChunkingTests(TestCase):
     def test_chunk_python_file(self):
         chunker = SemanticChunker()
-        source = '''import os
+        source = """import os
 
 def hello():
     print("hello")
@@ -68,7 +76,7 @@ def hello():
 class Calculator:
     def add(self, a, b):
         return a + b
-'''
+"""
         chunks = chunker.chunk_file('/test.py', source, 'python')
         self.assertGreater(len(chunks), 0)
         types = [c['chunk_type'] for c in chunks]
@@ -90,14 +98,18 @@ class Calculator:
 class IndexTaskTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
-            email='t@t.com', username='t', password='pass12345',
+            email='t@t.com',
+            username='t',
+            password='pass12345',
         )
         self.project = Project.objects.create(
             name='Idx Project',
             created_by=self.user,
         )
         ProjectMembership.objects.create(
-            project=self.project, user=self.user, role='owner',
+            project=self.project,
+            user=self.user,
+            role='owner',
         )
         self.repo = Repository.objects.create(
             project=self.project,
@@ -108,28 +120,33 @@ class IndexTaskTests(TestCase):
 
     def test_index_missing_path(self):
         from repositories.tasks import index_repository_task
+
         index_repository_task(str(self.repo.id))
         self.repo.refresh_from_db()
         self.assertEqual(self.repo.status, Repository.Status.ERROR)
 
     def test_save_chunks(self):
         from repositories.tasks import _save_chunks
+
         indexed = IndexedFile.objects.create(
             repository=self.repo,
             file_path='test.py',
             language='python',
             file_hash='abc',
         )
-        _save_chunks(indexed, [
-            {
-                'chunk_type': 'module',
-                'start_line': 1,
-                'end_line': 3,
-                'content': 'a\nb\nc',
-                'tokens_count': 3,
-                'metadata': {},
-            },
-        ])
+        _save_chunks(
+            indexed,
+            [
+                {
+                    'chunk_type': 'module',
+                    'start_line': 1,
+                    'end_line': 3,
+                    'content': 'a\nb\nc',
+                    'tokens_count': 3,
+                    'metadata': {},
+                },
+            ],
+        )
         count = CodeChunk.objects.filter(file=indexed).count()
         self.assertEqual(count, 1)
 
@@ -137,8 +154,11 @@ class IndexTaskTests(TestCase):
 class PruneTaskTests(TestCase):
     def setUp(self):
         import tempfile
+
         self.user = User.objects.create_user(
-            email='p@t.com', username='p', password='pass12345',
+            email='p@t.com',
+            username='p',
+            password='pass12345',
         )
         self.project = Project.objects.create(name='Prune Project', created_by=self.user)
         self.tmpdir = tempfile.TemporaryDirectory()
@@ -159,13 +179,20 @@ class PruneTaskTests(TestCase):
         (path / 'b.py').write_text('y = 2\n')
 
         stale = IndexedFile.objects.create(
-            repository=self.repo, file_path='gone.py', language='python', file_hash='old',
+            repository=self.repo,
+            file_path='gone.py',
+            language='python',
+            file_hash='old',
         )
         keep = IndexedFile.objects.create(
-            repository=self.repo, file_path='a.py', language='python', file_hash='old',
+            repository=self.repo,
+            file_path='a.py',
+            language='python',
+            file_hash='old',
         )
 
         from repositories.tasks import index_repository_task
+
         index_repository_task(str(self.repo.id))
 
         self.assertFalse(IndexedFile.objects.filter(id=stale.id).exists())
@@ -173,16 +200,86 @@ class PruneTaskTests(TestCase):
         self.assertEqual(IndexedFile.objects.filter(repository=self.repo).count(), 2)
 
 
+class EmbeddingTaskTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email='e@t.com',
+            username='e',
+            password='pass12345',
+        )
+        self.project = Project.objects.create(name='Embed Project', created_by=self.user)
+        ProjectMembership.objects.create(
+            project=self.project,
+            user=self.user,
+            role='owner',
+        )
+        self.repo = Repository.objects.create(
+            project=self.project,
+            git_url='https://github.com/user/repo.git',
+            git_branch='main',
+            local_path='/tmp',
+        )
+        self.indexed = IndexedFile.objects.create(
+            repository=self.repo,
+            file_path='a.py',
+            language='python',
+            file_hash='abc',
+        )
+        self.chunk = CodeChunk.objects.create(
+            file=self.indexed,
+            chunk_type='module',
+            start_line=1,
+            end_line=1,
+            content='x = 1',
+            tokens_count=1,
+        )
+
+    @patch('repositories.tasks._call_embed_api')
+    def test_skips_empty_vectors(self, mock_embed):
+        from repositories.tasks import generate_embeddings_task
+
+        mock_embed.return_value = [[0.0] * 768, [], [1.0] * 768]
+        other = CodeChunk.objects.create(
+            file=self.indexed,
+            chunk_type='module',
+            start_line=2,
+            end_line=2,
+            content='y = 2',
+            tokens_count=1,
+        )
+        CodeChunk.objects.create(
+            file=self.indexed,
+            chunk_type='module',
+            start_line=3,
+            end_line=3,
+            content='z = 3',
+            tokens_count=1,
+        )
+        generate_embeddings_task(str(self.repo.id))
+
+        self.assertEqual(ChunkEmbedding.objects.count(), 2)
+        self.repo.refresh_from_db()
+        self.assertEqual(self.repo.status, Repository.Status.ERROR)
+        self.assertIn('1 chunks failed to embed', self.repo.error_message)
+        self.assertFalse(
+            ChunkEmbedding.objects.filter(chunk=other).exists(),
+        )
+
+
 class DailyPullTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
-            email='d@t.com', username='d', password='pass12345',
+            email='d@t.com',
+            username='d',
+            password='pass12345',
         )
         self.project = Project.objects.create(name='Daily Project', created_by=self.user)
         self.repo = _make_repo(self.project, auto_pull=True)
         self.off = _make_repo(self.project, auto_pull=False)
         self.busy = _make_repo(
-            self.project, auto_pull=True, status=Repository.Status.INDEXING,
+            self.project,
+            auto_pull=True,
+            status=Repository.Status.INDEXING,
         )
 
     @patch('repositories.tasks.index_repository_task')
@@ -191,6 +288,7 @@ class DailyPullTests(TestCase):
         mock_clone.return_value = __import__('pathlib').Path('/tmp/repo')
 
         from repositories.tasks import run_daily_pulls
+
         run_daily_pulls()
 
         self.assertEqual(mock_clone.call_count, 1)
@@ -204,6 +302,7 @@ class DailyPullTests(TestCase):
         mock_clone.side_effect = Exception('pull failed')
 
         from repositories.tasks import run_daily_pulls
+
         run_daily_pulls()
 
         self.repo.refresh_from_db()

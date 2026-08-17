@@ -1,21 +1,24 @@
-from rest_framework import viewsets, permissions, status
+from django.db.models import Q
+from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.db.models import Q
-from .models import Project, ProjectMembership
-from .serializers import ProjectSerializer, ProjectMembershipSerializer
+
 from repositories.models import Repository
 from repositories.serializers import RepositorySerializer
 
+from .models import Project
+from .serializers import ProjectMembershipSerializer, ProjectSerializer
+
+
 class IsProjectMember(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
-        if hasattr(obj, 'project'):
-            project = obj.project
-        else:
-            project = obj
+        if request.user.is_superuser:
+            return True
+        project = obj.project if hasattr(obj, 'project') else obj
         if project.memberships.filter(user=request.user).exists():
             return True
         return project.groups.filter(id__in=request.user.groups.all()).exists()
+
 
 class ProjectViewSet(viewsets.ModelViewSet):
     serializer_class = ProjectSerializer
@@ -27,9 +30,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
             qs = Project.objects.all()
         else:
             qs = Project.objects.filter(
-                Q(created_by=user) |
-                Q(memberships__user=user) |
-                Q(groups__in=user.groups.all())
+                Q(created_by=user) | Q(memberships__user=user) | Q(groups__in=user.groups.all())
             )
         return qs.distinct().prefetch_related('memberships__user').order_by('-created_at')
 

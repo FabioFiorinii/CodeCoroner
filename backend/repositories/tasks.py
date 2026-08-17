@@ -6,8 +6,8 @@ from celery import shared_task
 from django.conf import settings
 from django.utils import timezone
 
-from .models import Repository, IndexedFile, CodeChunk, ChunkEmbedding
 from .chunking import SemanticChunker
+from .models import ChunkEmbedding, CodeChunk, IndexedFile, Repository
 from .services import GitService
 
 logger = logging.getLogger(__name__)
@@ -17,18 +17,55 @@ git_service = GitService()
 chunker = SemanticChunker()
 
 IGNORED_DIRS = {
-    '.git', '__pycache__', 'node_modules', '.venv', 'venv',
-    '.tox', '.eggs', 'dist', 'build', '.next', '.nuxt',
-    'target', 'vendor', '.bundle', '.gradle', 'bin', 'obj',
-    '.idea', '.vscode', '.DS_Store',
+    '.git',
+    '__pycache__',
+    'node_modules',
+    '.venv',
+    'venv',
+    '.tox',
+    '.eggs',
+    'dist',
+    'build',
+    '.next',
+    '.nuxt',
+    'target',
+    'vendor',
+    '.bundle',
+    '.gradle',
+    'bin',
+    'obj',
+    '.idea',
+    '.vscode',
+    '.DS_Store',
 }
 
 IGNORED_EXTENSIONS = {
-    '.pyc', '.pyo', '.so', '.dll', '.dylib', '.exe',
-    '.jpg', '.jpeg', '.png', '.gif', '.ico', '.svg',
-    '.woff', '.woff2', '.ttf', '.eot', '.pdf',
-    '.zip', '.tar', '.gz', '.bz2', '.rar', '.7z',
-    '.min.js', '.min.css', '.map',
+    '.pyc',
+    '.pyo',
+    '.so',
+    '.dll',
+    '.dylib',
+    '.exe',
+    '.jpg',
+    '.jpeg',
+    '.png',
+    '.gif',
+    '.ico',
+    '.svg',
+    '.woff',
+    '.woff2',
+    '.ttf',
+    '.eot',
+    '.pdf',
+    '.zip',
+    '.tar',
+    '.gz',
+    '.bz2',
+    '.rar',
+    '.7z',
+    '.min.js',
+    '.min.css',
+    '.map',
 }
 
 
@@ -126,7 +163,9 @@ def index_repository_task(self, repo_id: str):
     generate_embeddings_task.delay(repo_id)
 
 
-def _chunk_source(indexed_file: IndexedFile, file_path: Path, content: bytes, language: str) -> list[dict]:
+def _chunk_source(
+    indexed_file: IndexedFile, file_path: Path, content: bytes, language: str
+) -> list[dict]:
     try:
         source = content.decode('utf-8')
     except UnicodeDecodeError:
@@ -186,15 +225,24 @@ def generate_embeddings_task(self, repo_id: str):
     failed = 0
 
     for i in range(0, total, batch_size):
-        batch = list(chunks[i:i + batch_size])
+        batch = list(chunks[i : i + batch_size])
         texts = [c.content for c in batch]
         chunk_ids = [str(c.id) for c in batch]
 
         try:
             vectors = _call_embed_api(texts)
-            if len(vectors) != len(chunk_ids):
-                logger.warning('Mismatch: got %d vectors for %d texts', len(vectors), len(chunk_ids))
-            for chunk_id, vector in zip(chunk_ids, vectors):
+        except Exception as exc:
+            logger.error('Embedding batch failed for repo %s: %s', repo_id, exc)
+            failed += len(batch)
+            continue
+
+        if len(vectors) != len(chunk_ids):
+            logger.warning('Mismatch: got %d vectors for %d texts', len(vectors), len(chunk_ids))
+        for chunk_id, vector in zip(chunk_ids, vectors, strict=False):
+            if not vector:
+                failed += 1
+                continue
+            try:
                 ChunkEmbedding.objects.update_or_create(
                     chunk_id=chunk_id,
                     defaults={
@@ -203,10 +251,10 @@ def generate_embeddings_task(self, repo_id: str):
                         'dimensions': 768,
                     },
                 )
-            embedded += len(batch)
-        except Exception as exc:
-            logger.error('Embedding batch failed for repo %s: %s', repo_id, exc)
-            failed += len(batch)
+                embedded += 1
+            except Exception as exc:
+                logger.error('Embedding store failed for chunk %s: %s', chunk_id, exc)
+                failed += 1
 
     if failed == 0:
         _finish_index(repo)
@@ -224,17 +272,22 @@ def _finish_index(repo: Repository):
     repo.save(update_fields=['status', 'last_indexed_at'])
     from webhooks.services import dispatch
 
-    dispatch(repo.project_id, 'repository.indexed', {
-        'id': str(repo.id),
-        'git_url': repo.git_url,
-        'status': repo.status,
-        'project': str(repo.project_id),
-        'file_count': repo.file_count,
-    })
+    dispatch(
+        repo.project_id,
+        'repository.indexed',
+        {
+            'id': str(repo.id),
+            'git_url': repo.git_url,
+            'status': repo.status,
+            'project': str(repo.project_id),
+            'file_count': repo.file_count,
+        },
+    )
 
 
 def _call_embed_api(texts: list[str]) -> list[list[float]]:
     import httpx
+
     ai_url = getattr(settings, 'AI_ENGINE_URL', 'http://ai-engine:8002')
     resp = httpx.post(
         f'{ai_url}/embed',

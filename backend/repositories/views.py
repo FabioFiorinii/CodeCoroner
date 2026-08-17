@@ -14,7 +14,13 @@ from .serializers import (
 
 class IsProjectMember(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
-        return obj.project.memberships.filter(user=request.user).exists()
+        if request.user.is_superuser:
+            return True
+        if obj.project and obj.project.memberships.filter(user=request.user).exists():
+            return True
+        if obj.project and obj.project.groups.filter(id__in=request.user.groups.all()).exists():
+            return True
+        return obj.groups.filter(id__in=request.user.groups.all()).exists()
 
 
 class RepositoryViewSet(viewsets.ModelViewSet):
