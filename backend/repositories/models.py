@@ -1,6 +1,8 @@
 import uuid
+
 from django.db import models
 from pgvector.django import VectorField
+
 
 class Repository(models.Model):
     class Status(models.TextChoices):
@@ -31,6 +33,7 @@ class Repository(models.Model):
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     file_count = models.IntegerField(default=0)
     total_bytes = models.BigIntegerField(default=0)
+    summary = models.TextField(blank=True, default='')
     error_message = models.TextField(blank=True, default='')
     last_indexed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -42,6 +45,7 @@ class Repository(models.Model):
 
     def __str__(self):
         return f'{self.git_url} ({self.status})'
+
 
 class IndexedFile(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -62,6 +66,7 @@ class IndexedFile(models.Model):
 
     def __str__(self):
         return self.file_path
+
 
 class CodeChunk(models.Model):
     class ChunkType(models.TextChoices):
@@ -95,6 +100,7 @@ class CodeChunk(models.Model):
 
     def __str__(self):
         return f'{self.file.file_path}:{self.start_line}-{self.end_line} ({self.chunk_type})'
+
 
 class ChunkEmbedding(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

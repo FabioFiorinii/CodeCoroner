@@ -9,6 +9,7 @@ from django.utils import timezone
 from .chunking import SemanticChunker
 from .models import ChunkEmbedding, CodeChunk, IndexedFile, Repository
 from .services import GitService
+from .summary import build_repo_summary
 
 logger = logging.getLogger(__name__)
 
@@ -159,6 +160,9 @@ def index_repository_task(self, repo_id: str):
     if indexed == 0 and errors == 0:
         _set_error(repo, 'No supported files found in repository')
         return
+
+    repo.summary = build_repo_summary(repo_path)
+    repo.save(update_fields=['summary'])
 
     generate_embeddings_task.delay(repo_id)
 

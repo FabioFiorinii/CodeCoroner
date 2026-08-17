@@ -4,33 +4,39 @@ from agents.base_agent import BaseAgent
 
 logger = logging.getLogger(__name__)
 
-REPORT_PROMPT = """You are a technical report writer. Generate a comprehensive bug analysis report in Markdown format.
+REPORT_PROMPT = """You are a technical report writer. Generate a CONCISE bug analysis report in Markdown format.
+
+Repo Overview:
+{repo_profile}
 
 Analysis Data:
 {analysis_data}
 
-Generate a well-structured Markdown report with these sections:
-1. **Summary** - brief overview
-2. **Error Context** - what error occurred, environment
-3. **Log Analysis** - key findings from logs/stacktrace
-4. **Bug Localization** - suspicious files ranked by probability
-5. **Root Cause Analysis** - detailed chain of causality
-6. **Conclusion** - recommended next steps
+Generate a short Markdown report (max 250 words total) with these sections:
+1. **Summary** - 1-2 sentences
+2. **Error Context** - error message and environment in one line
+3. **Root Cause** - root file/line and cause in 2-3 sentences
+4. **Fix Direction** - recommended next steps as a short bullet list
+
+Do not repeat the full error context or stacktrace. Be direct and skip fluff.
 
 Return ONLY valid JSON with this structure:
 {{
-  "title": "string - report title",
-  "markdown": "string - full report in Markdown format"
+  "title": "string - short report title",
+  "markdown": "string - concise Markdown report"
 }}"""
 
 
 class ReportGenerator(BaseAgent):
-    async def run(self, analysis_data: dict) -> dict:
+    async def run(self, analysis_data: dict, repo_profile: str = '') -> dict:
         prompt = REPORT_PROMPT.format(
+            repo_profile=repo_profile or '(no repo profile available)',
             analysis_data=json.dumps(analysis_data, indent=2),
         )
         try:
-            raw = await self.ollama.generate(self.settings.llm_model, prompt, format='json')
+            raw = await self.ollama.generate(
+                self.settings.llm_model, prompt, format='json', options={'num_predict': 450}
+            )
             result = self._parse_json(raw)
             result.setdefault('status', 'ok')
             if not result.get('markdown'):

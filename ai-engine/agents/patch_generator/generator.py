@@ -9,6 +9,9 @@ SUGGEST_FIX_PROMPT = """You are an expert software engineer. Given an error cont
 Error Context:
 {error_context}
 
+Repo Overview:
+{repo_profile}
+
 Log Analysis:
 {log_analysis}
 
@@ -30,11 +33,19 @@ Your task: analyze the bug and propose a fix. Return ONLY valid JSON with this e
 
 
 class PatchGenerator(BaseAgent):
-    async def run(self, error_context: dict, log_analysis: dict, bug_localization: dict | None, root_cause: dict | None, chunks: list) -> dict:
+    async def run(
+        self,
+        error_context: dict,
+        log_analysis: dict,
+        bug_localization: dict | None,
+        root_cause: dict | None,
+        chunks: list,
+        repo_profile: str = '',
+    ) -> dict:
         source_code = json.dumps([
             {
                 'file_path': c.get('file_path', ''),
-                'content': c.get('content', '')[:1500],
+                'content': c.get('content', '')[:4000],
                 'start_line': c.get('start_line', 0),
                 'end_line': c.get('end_line', 0),
             }
@@ -43,13 +54,16 @@ class PatchGenerator(BaseAgent):
 
         prompt = SUGGEST_FIX_PROMPT.format(
             error_context=json.dumps(error_context, indent=2),
+            repo_profile=repo_profile or '(no repo profile available)',
             log_analysis=json.dumps(log_analysis, indent=2),
             bug_localization=json.dumps(bug_localization, indent=2),
             root_cause=json.dumps(root_cause, indent=2),
             source_code=source_code,
         )
         try:
-            raw = await self.ollama.generate(self.settings.rca_model, prompt, format='json')
+            raw = await self.ollama.generate(
+                self.settings.rca_model, prompt, format='json', options={'num_predict': 600}
+            )
             result = self._parse_json(raw)
             result.setdefault('status', 'ok')
             result.setdefault('diff', '')

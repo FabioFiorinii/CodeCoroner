@@ -1,10 +1,13 @@
 import json
 import logging
+import re
 from agents.base_agent import BaseAgent
 
 logger = logging.getLogger(__name__)
 
-LOCALIZE_PROMPT = """You are a bug localization expert. Given error context and code chunks from the repository, identify which files are most likely to contain the bug.
+STACKTRACE_FILE_RE = re.compile(r'File "([^"]+)"')
+
+LOCALIZE_PROMPT = """You are a bug localization expert. The program crashed with the error below.
 
 Log Analysis:
 {log_analysis}
@@ -12,49 +15,62 @@ Log Analysis:
 Error Context:
 {error_context}
 
-Top Code Chunks (from vector similarity search):
-{chunks}
+Repo Overview:
+{repo_profile}
 
-For each chunk, analyze:
-1. Does the code pattern match the error type?
-2. Could the logic in this chunk produce the observed error?
-3. Is this file directly implicated by the error message or stacktrace?
+The exception was raised in the innermost stacktrace frame. The chunks below are the candidate files, ordered by relevance (stacktrace files first). One of them contains the code where the error is raised.
+
+Candidate chunks:
+{candidate_list}
+
+Instructions:
+1. Check each candidate's code and find the one that can raise the observed error. The innermost stacktrace file is the primary suspect; if its code matches the error pattern, it is the answer.
+2. Prefer source files (e.g. "thefuck/rules/switch_lang.py") over test files (e.g. "tests/rules/test_switch_lang.py").
+3. Include at least the top 3 most suspicious candidates, ranked by descending score.
+4. "file_path" MUST be an exact string from the candidate list above. NEVER invent a path.
 
 Return ONLY valid JSON with this exact structure:
 {{
-  "summary": "string - brief summary of localization findings",
+  "summary": "string - brief summary, at most 2 sentences",
   "suspicious_files": [
     {{
-      "file_path": "string",
+      "file_path": "string - EXACT path from the candidate list",
       "score": 0.0-1.0,
       "evidence": "string - why this file is suspicious",
       "rank": 1
     }}
   ]
-}}
-
-Rank suspicious files by score descending (highest suspicion first). Include at least the top 3-5 files. If no files seem relevant, return empty suspicious_files array."""
+}}"""
 
 
 class BugLocalizer(BaseAgent):
-    async def run(self, repo_id: str, error_context: dict, log_analysis: dict, chunks: list) -> dict:
-        chunks_text = json.dumps([
-            {
-                'file_path': c.get('file_path', ''),
-                'language': c.get('language', ''),
-                'content': c.get('content', '')[:2000],
-                'similarity': c.get('similarity', 0),
-            }
-            for c in (chunks or [])
-        ], indent=2)
+    async def run(
+        self,
+        repo_id: str,
+        error_context: dict,
+        log_analysis: dict,
+        chunks: list,
+        repo_profile: str = '',
+    ) -> dict:
+        stacktrace_files = self._extract_stacktrace_files(error_context)
+        ordered_chunks = self._order_chunks(chunks, stacktrace_files, limit=5)
+        candidate_list = '\n\n'.join(
+            f'[{i}] {c.get("file_path", "")}\n```{c.get("language", "")}\n'
+            + c.get('content', '')[:2500]
+            + '\n```'
+            for i, c in enumerate(ordered_chunks, start=1)
+        )
 
         prompt = LOCALIZE_PROMPT.format(
             log_analysis=json.dumps(log_analysis, indent=2),
             error_context=json.dumps(error_context, indent=2),
-            chunks=chunks_text,
+            repo_profile=repo_profile or '(no repo profile available)',
+            candidate_list=candidate_list,
         )
         try:
-            raw = await self.ollama.generate(self.settings.llm_model, prompt, format='json')
+            raw = await self.ollama.generate(
+                self.settings.llm_model, prompt, format='json', options={'num_predict': 600}
+            )
             result = self._parse_json(raw)
             result.setdefault('status', 'ok')
             return result
@@ -66,6 +82,28 @@ class BugLocalizer(BaseAgent):
                 'summary': 'Bug localization failed',
                 'suspicious_files': [],
             }
+
+    def _extract_stacktrace_files(self, error_context: dict) -> list[str]:
+        files = []
+        for key in ('stacktrace', 'logs'):
+            text = error_context.get(key)
+            if not isinstance(text, str):
+                continue
+            for match in STACKTRACE_FILE_RE.finditer(text):
+                path = match.group(1)
+                if path not in files:
+                    files.append(path)
+        return files
+
+    def _is_stacktrace_file(self, chunk: dict, stacktrace_files: list[str]) -> bool:
+        path = chunk.get('file_path', '') or ''
+        return any(path == f or path.endswith(f) or f.endswith(path) for f in stacktrace_files)
+
+    def _order_chunks(self, chunks: list, stacktrace_files: list[str], limit: int = 10) -> list:
+        chunks = list(chunks or [])
+        matched = [c for c in chunks if self._is_stacktrace_file(c, stacktrace_files)]
+        rest = [c for c in chunks if not self._is_stacktrace_file(c, stacktrace_files)]
+        return (matched + rest)[:limit]
 
     def _parse_json(self, raw: str) -> dict:
         raw = raw.strip()

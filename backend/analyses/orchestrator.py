@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import time
 
 import httpx
@@ -10,7 +11,7 @@ from django.db import transaction
 from django.utils import timezone
 from pgvector.django import CosineDistance
 
-from repositories.models import ChunkEmbedding
+from repositories.models import ChunkEmbedding, IndexedFile
 from webhooks.services import dispatch
 
 from .models import (
@@ -26,6 +27,8 @@ from .models import (
 logger = logging.getLogger(__name__)
 
 AI_URL = getattr(settings, 'AI_ENGINE_URL', 'http://ai-engine:8002')
+
+STACKTRACE_FILE_RE = re.compile(r'File "([^"]+)"')
 
 
 def _safe_float(value, default=0.0):
@@ -52,6 +55,47 @@ class AnalysisOrchestrator:
         self.channel_layer = get_channel_layer()
         self.current_step = None
         self.model_llm, self.model_rca = self._resolve_models()
+        self.repo_profile = self._load_repo_profile()
+
+    def _load_repo_profile(self) -> str:
+        try:
+            return getattr(self.analysis.repository, 'summary', '') or ''
+        except Exception:
+            return ''
+
+    @staticmethod
+    def _stacktrace_files(ctx: dict) -> list[str]:
+        files = []
+        for key in ('stacktrace', 'logs'):
+            text = ctx.get(key)
+            if not isinstance(text, str):
+                continue
+            for match in STACKTRACE_FILE_RE.finditer(text):
+                path = match.group(1)
+                if path not in files:
+                    files.append(path)
+        return files
+
+    @staticmethod
+    def _stacktrace_file_chunks(repo_id, stacktrace_files: list[str]) -> list:
+        if not stacktrace_files:
+            return []
+        repo_paths = list(
+            IndexedFile.objects.filter(repository_id=repo_id).values_list('id', 'file_path')
+        )
+        file_ids = set()
+        for stack_file in stacktrace_files:
+            for fid, fpath in repo_paths:
+                if fpath == stack_file or fpath.endswith(stack_file) or stack_file.endswith(fpath):
+                    file_ids.add(fid)
+        if not file_ids:
+            return []
+        return list(
+            ChunkEmbedding.objects.filter(
+                chunk__file__repository_id=repo_id,
+                chunk__file_id__in=file_ids,
+            ).select_related('chunk', 'chunk__file')
+        )
 
     def _resolve_models(self):
         try:
@@ -223,6 +267,7 @@ class AnalysisOrchestrator:
             'analyze-logs',
             {
                 'error_context': self.analysis.error_context,
+                'repo_profile': self.repo_profile,
                 'model': self.model_llm,
             },
         )
@@ -248,7 +293,13 @@ class AnalysisOrchestrator:
             raise RuntimeError('Failed to get query embedding')
         return embeddings[0]
 
-    def _retrieve_top_chunks(self, repo_id, query_vectors: list, limit: int = 30) -> list:
+    def _retrieve_top_chunks(
+        self,
+        repo_id,
+        query_vectors: list,
+        limit: int = 30,
+        stacktrace_files: list[str] | None = None,
+    ) -> list:
         base = ChunkEmbedding.objects.filter(chunk__file__repository_id=repo_id)
         merged: dict = {}
         for qvec in query_vectors:
@@ -262,14 +313,24 @@ class AnalysisOrchestrator:
                 if cid not in merged or ce.distance < merged[cid][0]:
                     merged[cid] = (ce.distance, ce)
         ranked = sorted(merged.values(), key=lambda t: t[0])[:limit]
-        return [t[1] for t in ranked]
+        ranked_objs = [t[1] for t in ranked]
+
+        if stacktrace_files:
+            exact = self._stacktrace_file_chunks(repo_id, stacktrace_files)
+            seen = {ce.chunk_id for ce in ranked_objs}
+            exact = [ce for ce in exact if ce.chunk_id not in seen]
+            return (exact + ranked_objs)[:limit]
+        return ranked_objs
 
     def _localize_bug(self):
         ctx = self.analysis.error_context
         query_vectors = [self._embed_query(q) for q in self._retrieval_queries(ctx)]
+        stacktrace_files = self._stacktrace_files(ctx)
 
         repo_id = self.analysis.repository_id
-        similar = self._retrieve_top_chunks(repo_id, query_vectors)
+        similar = self._retrieve_top_chunks(
+            repo_id, query_vectors, stacktrace_files=stacktrace_files
+        )
 
         chunks_for_ai = []
         for ce in similar:
@@ -281,7 +342,7 @@ class AnalysisOrchestrator:
                     'content': chunk.content,
                     'start_line': chunk.start_line,
                     'end_line': chunk.end_line,
-                    'similarity': float(1.0 - ce.distance) if hasattr(ce, 'distance') else 0,
+                    'similarity': float(1.0 - ce.distance) if hasattr(ce, 'distance') else 1.0,
                 }
             )
         self.top_chunks = chunks_for_ai
@@ -293,6 +354,7 @@ class AnalysisOrchestrator:
                 'error_context': ctx,
                 'log_analysis': self.log_analysis,
                 'chunks': chunks_for_ai,
+                'repo_profile': self.repo_profile,
                 'model': self.model_llm,
             },
         )
@@ -337,6 +399,7 @@ class AnalysisOrchestrator:
                 'log_analysis': self.log_analysis,
                 'suspicious_files': suspicious,
                 'chunks': root_chunks,
+                'repo_profile': self.repo_profile,
                 'model': self.model_rca,
             },
         )
@@ -398,6 +461,7 @@ class AnalysisOrchestrator:
             'generate-report',
             {
                 'analysis_data': analysis_data,
+                'repo_profile': self.repo_profile,
                 'model': self.model_llm,
             },
         )
@@ -445,6 +509,7 @@ class AnalysisOrchestrator:
                 'bug_localization': bug_loc,
                 'root_cause': rca,
                 'chunks': getattr(self, 'top_chunks', [])[:5],
+                'repo_profile': self.repo_profile,
                 'model': self.model_rca,
             },
         )

@@ -77,6 +77,7 @@ class IndexRequest(BaseModel):
 
 class AnalyzeLogsRequest(BaseModel):
     error_context: dict
+    repo_profile: str = ''
     model: str | None = None
 
 
@@ -85,6 +86,7 @@ class LocalizeBugRequest(BaseModel):
     error_context: dict
     log_analysis: dict
     chunks: list
+    repo_profile: str = ''
     model: str | None = None
 
 
@@ -94,11 +96,13 @@ class RootCauseRequest(BaseModel):
     log_analysis: dict
     suspicious_files: list
     chunks: list
+    repo_profile: str = ''
     model: str | None = None
 
 
 class ReportRequest(BaseModel):
     analysis_data: dict
+    repo_profile: str = ''
     model: str | None = None
 
 
@@ -108,6 +112,7 @@ class SuggestFixRequest(BaseModel):
     bug_localization: dict | None = None
     root_cause: dict | None = None
     chunks: list = []
+    repo_profile: str = ''
     model: str | None = None
 
 
@@ -214,7 +219,7 @@ async def analyze_logs(req: AnalyzeLogsRequest):
     try:
         model = await resolve_model(req.model, settings.llm_model)
         log_analyzer.settings.llm_model = model
-        result = await log_analyzer.run(req.error_context)
+        result = await log_analyzer.run(req.error_context, repo_profile=req.repo_profile)
         if result.get('status') == 'error':
             raise HTTPException(status_code=502, detail=result.get('error', 'Log analysis failed'))
         return result
@@ -235,6 +240,7 @@ async def localize_bug(req: LocalizeBugRequest):
             error_context=req.error_context,
             log_analysis=req.log_analysis,
             chunks=req.chunks,
+            repo_profile=req.repo_profile,
         )
         if result.get('status') == 'error':
             raise HTTPException(status_code=502, detail=result.get('error', 'Bug localization failed'))
@@ -257,6 +263,7 @@ async def analyze_root_cause(req: RootCauseRequest):
             log_analysis=req.log_analysis,
             suspicious_files=req.suspicious_files,
             chunks=req.chunks,
+            repo_profile=req.repo_profile,
         )
         if result.get('status') == 'error':
             raise HTTPException(status_code=502, detail=result.get('error', 'Root cause analysis failed'))
@@ -279,6 +286,7 @@ async def suggest_fix(req: SuggestFixRequest):
             bug_localization=req.bug_localization,
             root_cause=req.root_cause,
             chunks=req.chunks,
+            repo_profile=req.repo_profile,
         )
         if result.get('status') == 'error':
             raise HTTPException(status_code=502, detail=result.get('error', 'Fix suggestion failed'))
@@ -295,7 +303,7 @@ async def generate_report(req: ReportRequest):
     try:
         model = await resolve_model(req.model, settings.llm_model)
         report_gen.settings.llm_model = model
-        result = await report_gen.run(req.analysis_data)
+        result = await report_gen.run(req.analysis_data, repo_profile=req.repo_profile)
         if result.get('status') == 'error':
             raise HTTPException(status_code=502, detail=result.get('error', 'Report generation failed'))
         return result
