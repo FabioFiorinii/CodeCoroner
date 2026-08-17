@@ -1,17 +1,27 @@
-import time
 import json
 import logging
+import time
+
 import httpx
-from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from pgvector.django import CosineDistance
 
-from .models import Analysis, AnalysisRun, BugLocalization, SuspiciousFileScore, RootCause, FixSuggestion, Report
-from repositories.models import ChunkEmbedding, CodeChunk
+from repositories.models import ChunkEmbedding
 from webhooks.services import dispatch
+
+from .models import (
+    Analysis,
+    AnalysisRun,
+    BugLocalization,
+    FixSuggestion,
+    Report,
+    RootCause,
+    SuspiciousFileScore,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +36,7 @@ def _safe_float(value, default=0.0):
     except (ValueError, TypeError):
         return default
 
+
 def _safe_int(value, default=None):
     if value is None:
         return default
@@ -33,6 +44,7 @@ def _safe_int(value, default=None):
         return int(value)
     except (ValueError, TypeError):
         return default
+
 
 class AnalysisOrchestrator:
     def __init__(self, analysis: Analysis):
@@ -44,6 +56,7 @@ class AnalysisOrchestrator:
     def _resolve_models(self):
         try:
             from common.models import PlatformSetting
+
             tier = PlatformSetting.get_solo().model_tier
             cfg = settings.MODEL_TIERS.get(tier, {})
             return cfg.get('llm_model', ''), cfg.get('rca_model', '')
@@ -52,9 +65,9 @@ class AnalysisOrchestrator:
 
     def _fail_current_step(self, error):
         if self.current_step:
-            AnalysisRun.objects.filter(
-                analysis=self.analysis, step=self.current_step
-            ).update(status='failed', completed_at=timezone.now(), error=error)
+            AnalysisRun.objects.filter(analysis=self.analysis, step=self.current_step).update(
+                status='failed', completed_at=timezone.now(), error=error
+            )
 
     def execute(self):
         start_time = time.time()
@@ -97,13 +110,17 @@ class AnalysisOrchestrator:
             self._update_status(Analysis.Status.COMPLETED)
             self.current_step = None
             self._record_run('completed', status='completed')
-            dispatch(self.analysis.project_id, 'analysis.completed', {
-                'id': str(self.analysis.id),
-                'title': self.analysis.title,
-                'status': self.analysis.status,
-                'project': str(self.analysis.project_id),
-                'duration_seconds': int(time.time() - start_time),
-            })
+            dispatch(
+                self.analysis.project_id,
+                'analysis.completed',
+                {
+                    'id': str(self.analysis.id),
+                    'title': self.analysis.title,
+                    'status': self.analysis.status,
+                    'project': str(self.analysis.project_id),
+                    'duration_seconds': int(time.time() - start_time),
+                },
+            )
 
         except Exception as e:
             logger.exception(f'Analysis {self.analysis.id} failed')
@@ -113,13 +130,17 @@ class AnalysisOrchestrator:
             with transaction.atomic():
                 self.analysis.save(update_fields=['status', 'error_message'])
             self._record_run('failed', status='failed', error=str(e))
-            dispatch(self.analysis.project_id, 'analysis.failed', {
-                'id': str(self.analysis.id),
-                'title': self.analysis.title,
-                'status': self.analysis.status,
-                'project': str(self.analysis.project_id),
-                'error': str(e),
-            })
+            dispatch(
+                self.analysis.project_id,
+                'analysis.failed',
+                {
+                    'id': str(self.analysis.id),
+                    'title': self.analysis.title,
+                    'status': self.analysis.status,
+                    'project': str(self.analysis.project_id),
+                    'error': str(e),
+                },
+            )
         finally:
             self.analysis.duration_seconds = int(time.time() - start_time)
             self.analysis.save(update_fields=['duration_seconds'])
@@ -157,18 +178,22 @@ class AnalysisOrchestrator:
                     'data': {
                         'id': str(self.analysis.id),
                         'status': self.analysis.status,
-                        'runs': list(AnalysisRun.objects.filter(
-                            analysis=self.analysis
-                        ).values('step', 'status', 'started_at', 'completed_at', 'error')),
+                        'runs': list(
+                            AnalysisRun.objects.filter(analysis=self.analysis).values(
+                                'step', 'status', 'started_at', 'completed_at', 'error'
+                            )
+                        ),
                     },
                 },
             )
 
     def _ensure_repo_indexed(self):
         from repositories.models import Repository
+
         repo = self.analysis.repository
         if repo.status != Repository.Status.INDEXED:
             from repositories.tasks import index_repository_task
+
             index_repository_task(str(repo.id))
 
     def _call_ai(self, endpoint: str, payload: dict, timeout: int = 600) -> dict:
@@ -177,55 +202,83 @@ class AnalysisOrchestrator:
         return resp.json()
 
     def _analyze_input(self):
-        result = self._call_ai('analyze-logs', {
-            'error_context': self.analysis.error_context,
-            'model': self.model_llm,
-        })
+        result = self._call_ai(
+            'analyze-logs',
+            {
+                'error_context': self.analysis.error_context,
+                'model': self.model_llm,
+            },
+        )
         self.log_analysis = result
-        AnalysisRun.objects.filter(
-            analysis=self.analysis, step='analyze_input'
-        ).update(output=result)
+        AnalysisRun.objects.filter(analysis=self.analysis, step='analyze_input').update(
+            output=result
+        )
+
+    def _retrieval_queries(self, ctx: dict) -> list[str]:
+        fields = [ctx.get(key) for key in ('error_message', 'description', 'stacktrace', 'logs')]
+        queries = []
+        for _i, val in enumerate(fields):
+            if isinstance(val, str) and val.strip():
+                queries.append(val.strip())
+        if fields[0] and fields[1]:
+            queries.append(f'{fields[0].strip()}\n{fields[1].strip()}')
+        return list(dict.fromkeys(q for q in queries if q)) or [json.dumps(ctx)]
+
+    def _embed_query(self, text: str) -> list:
+        resp = self._call_ai('embed', {'texts': [text], 'model': 'nomic-embed-text'})
+        embeddings = resp.get('embeddings', [])
+        if not embeddings:
+            raise RuntimeError('Failed to get query embedding')
+        return embeddings[0]
+
+    def _retrieve_top_chunks(self, repo_id, query_vectors: list, limit: int = 30) -> list:
+        base = ChunkEmbedding.objects.filter(chunk__file__repository_id=repo_id)
+        merged: dict = {}
+        for qvec in query_vectors:
+            similar = (
+                base.annotate(distance=CosineDistance('embedding', qvec))
+                .select_related('chunk', 'chunk__file')
+                .order_by('distance')[:15]
+            )
+            for ce in similar:
+                cid = ce.chunk_id
+                if cid not in merged or ce.distance < merged[cid][0]:
+                    merged[cid] = (ce.distance, ce)
+        ranked = sorted(merged.values(), key=lambda t: t[0])[:limit]
+        return [t[1] for t in ranked]
 
     def _localize_bug(self):
         ctx = self.analysis.error_context
-        error_text = json.dumps(ctx.get('error_message', '') or ctx.get('description', '') or ctx)
-
-        embed_resp = self._call_ai('embed', {
-            'texts': [error_text],
-            'model': 'nomic-embed-text',
-        })
-        embeddings = embed_resp.get('embeddings', [])
-        if not embeddings:
-            raise RuntimeError('Failed to get query embedding')
-        query_vector = embeddings[0]
+        query_vectors = [self._embed_query(q) for q in self._retrieval_queries(ctx)]
 
         repo_id = self.analysis.repository_id
-        similar = ChunkEmbedding.objects.filter(
-            chunk__file__repository_id=repo_id,
-        ).annotate(
-            distance=CosineDistance('embedding', query_vector)
-        ).select_related('chunk', 'chunk__file').order_by('distance')[:30]
+        similar = self._retrieve_top_chunks(repo_id, query_vectors)
 
         chunks_for_ai = []
         for ce in similar:
             chunk = ce.chunk
-            chunks_for_ai.append({
-                'file_path': chunk.file.file_path,
-                'language': chunk.file.language,
-                'content': chunk.content,
-                'start_line': chunk.start_line,
-                'end_line': chunk.end_line,
-                'similarity': float(1.0 - ce.distance) if hasattr(ce, 'distance') else 0,
-            })
+            chunks_for_ai.append(
+                {
+                    'file_path': chunk.file.file_path,
+                    'language': chunk.file.language,
+                    'content': chunk.content,
+                    'start_line': chunk.start_line,
+                    'end_line': chunk.end_line,
+                    'similarity': float(1.0 - ce.distance) if hasattr(ce, 'distance') else 0,
+                }
+            )
         self.top_chunks = chunks_for_ai
 
-        result = self._call_ai('localize-bug', {
-            'repo_id': str(self.analysis.repository_id),
-            'error_context': ctx,
-            'log_analysis': self.log_analysis,
-            'chunks': chunks_for_ai,
-            'model': self.model_llm,
-        })
+        result = self._call_ai(
+            'localize-bug',
+            {
+                'repo_id': str(self.analysis.repository_id),
+                'error_context': ctx,
+                'log_analysis': self.log_analysis,
+                'chunks': chunks_for_ai,
+                'model': self.model_llm,
+            },
+        )
         self.localization_result = result
 
         suspicious = result.get('suspicious_files', [])
@@ -243,9 +296,9 @@ class AnalysisOrchestrator:
                     rank=_safe_int(item.get('rank'), 0),
                 )
 
-        AnalysisRun.objects.filter(
-            analysis=self.analysis, step='bug_localization'
-        ).update(output=result)
+        AnalysisRun.objects.filter(analysis=self.analysis, step='bug_localization').update(
+            output=result
+        )
 
     def _root_cause(self):
         suspicious = []
@@ -259,14 +312,17 @@ class AnalysisOrchestrator:
         top_paths = {s['file_path'] for s in suspicious[:5]}
         root_chunks = [c for c in getattr(self, 'top_chunks', []) if c['file_path'] in top_paths]
 
-        result = self._call_ai('analyze-root-cause', {
-            'repo_id': str(self.analysis.repository_id),
-            'error_context': self.analysis.error_context,
-            'log_analysis': self.log_analysis,
-            'suspicious_files': suspicious,
-            'chunks': root_chunks,
-            'model': self.model_rca,
-        })
+        result = self._call_ai(
+            'analyze-root-cause',
+            {
+                'repo_id': str(self.analysis.repository_id),
+                'error_context': self.analysis.error_context,
+                'log_analysis': self.log_analysis,
+                'suspicious_files': suspicious,
+                'chunks': root_chunks,
+                'model': self.model_rca,
+            },
+        )
         self.rca_result = result
 
         RootCause.objects.create(
@@ -279,9 +335,7 @@ class AnalysisOrchestrator:
             reasoning=result.get('reasoning', ''),
         )
 
-        AnalysisRun.objects.filter(
-            analysis=self.analysis, step='root_cause'
-        ).update(output=result)
+        AnalysisRun.objects.filter(analysis=self.analysis, step='root_cause').update(output=result)
 
     def _generate_report(self):
         bug_loc = None
@@ -289,9 +343,11 @@ class AnalysisOrchestrator:
             bl = self.analysis.bug_localization
             bug_loc = {
                 'summary': bl.summary,
-                'suspicious_files': list(bl.suspicious_files.all().values(
-                    'file_path', 'suspicion_score', 'evidence', 'rank'
-                )),
+                'suspicious_files': list(
+                    bl.suspicious_files.all().values(
+                        'file_path', 'suspicion_score', 'evidence', 'rank'
+                    )
+                ),
             }
 
         rca = None
@@ -321,10 +377,13 @@ class AnalysisOrchestrator:
             'repository': repo_info,
         }
 
-        result = self._call_ai('generate-report', {
-            'analysis_data': analysis_data,
-            'model': self.model_llm,
-        })
+        result = self._call_ai(
+            'generate-report',
+            {
+                'analysis_data': analysis_data,
+                'model': self.model_llm,
+            },
+        )
 
         Report.objects.create(
             analysis=self.analysis,
@@ -332,9 +391,9 @@ class AnalysisOrchestrator:
             format='markdown',
         )
 
-        AnalysisRun.objects.filter(
-            analysis=self.analysis, step='generate_report'
-        ).update(output=result)
+        AnalysisRun.objects.filter(analysis=self.analysis, step='generate_report').update(
+            output=result
+        )
 
     def _suggest_fix(self):
         bug_loc = None
@@ -342,9 +401,11 @@ class AnalysisOrchestrator:
             bl = self.analysis.bug_localization
             bug_loc = {
                 'summary': bl.summary,
-                'suspicious_files': list(bl.suspicious_files.all().values(
-                    'file_path', 'suspicion_score', 'evidence', 'rank'
-                )),
+                'suspicious_files': list(
+                    bl.suspicious_files.all().values(
+                        'file_path', 'suspicion_score', 'evidence', 'rank'
+                    )
+                ),
             }
 
         rca = None
@@ -359,14 +420,17 @@ class AnalysisOrchestrator:
                 'reasoning': rc.reasoning,
             }
 
-        result = self._call_ai('suggest-fix', {
-            'error_context': self.analysis.error_context,
-            'log_analysis': self.log_analysis,
-            'bug_localization': bug_loc,
-            'root_cause': rca,
-            'chunks': getattr(self, 'top_chunks', [])[:5],
-            'model': self.model_rca,
-        })
+        result = self._call_ai(
+            'suggest-fix',
+            {
+                'error_context': self.analysis.error_context,
+                'log_analysis': self.log_analysis,
+                'bug_localization': bug_loc,
+                'root_cause': rca,
+                'chunks': getattr(self, 'top_chunks', [])[:5],
+                'model': self.model_rca,
+            },
+        )
 
         FixSuggestion.objects.create(
             analysis=self.analysis,
@@ -375,6 +439,6 @@ class AnalysisOrchestrator:
             explanation=result.get('explanation', ''),
         )
 
-        AnalysisRun.objects.filter(
-            analysis=self.analysis, step='fix_suggestion'
-        ).update(output=result)
+        AnalysisRun.objects.filter(analysis=self.analysis, step='fix_suggestion').update(
+            output=result
+        )
