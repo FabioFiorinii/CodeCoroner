@@ -1,10 +1,14 @@
-from rest_framework import viewsets, permissions, status
+from django.db.models import Q
+from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import Repository, IndexedFile, CodeChunk
+
+from .models import CodeChunk, Repository
 from .serializers import (
-    RepositorySerializer, RepositoryCreateSerializer,
-    IndexedFileSerializer, CodeChunkSerializer,
+    CodeChunkSerializer,
+    IndexedFileSerializer,
+    RepositoryCreateSerializer,
+    RepositorySerializer,
 )
 
 
@@ -22,9 +26,15 @@ class RepositoryViewSet(viewsets.ModelViewSet):
         return RepositorySerializer
 
     def get_queryset(self):
-        qs = Repository.objects.all()
-        if not self.request.user.is_superuser:
-            qs = qs.filter(groups__in=self.request.user.groups.all())
+        user = self.request.user
+        if user.is_superuser:
+            qs = Repository.objects.all()
+        else:
+            qs = Repository.objects.filter(
+                Q(project__memberships__user=user) |
+                Q(project__groups__in=user.groups.all()) |
+                Q(groups__in=user.groups.all())
+            )
         return qs.distinct()
 
     def perform_create(self, serializer):

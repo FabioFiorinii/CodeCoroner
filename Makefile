@@ -1,4 +1,4 @@
-.PHONY: up down build logs migrate test lint shell clean
+.PHONY: up down build logs migrate test lint shell seed seed-demo superuser clean restart ps
 
 up:
 	podman-compose up -d
@@ -26,6 +26,9 @@ shell:
 	podman-compose exec django python manage.py shell
 
 seed:
+	podman-compose exec django python manage.py seed_base
+
+seed-demo:
 	podman-compose exec django python manage.py seed_demo
 
 superuser:

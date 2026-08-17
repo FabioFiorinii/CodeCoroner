@@ -1,24 +1,37 @@
 import re
+
 from rest_framework import serializers
-from django.contrib.auth.models import Group
-from .models import Repository, IndexedFile, CodeChunk, ChunkEmbedding
 
+from .models import CodeChunk, IndexedFile, Repository
 
-GIT_URL_PATTERN = re.compile(
-    r'^(https?://|git@)[\w\.-]+(:[\d]+)?[/:][\w\.-]+/[\w\.-]+(\.git)?/?$'
-)
+GIT_URL_PATTERN = re.compile(r'^(https?://|git@)[\w\.-]+(:[\d]+)?[/:][\w\.-]+/[\w\.-]+(\.git)?/?$')
 
 
 class RepositoryCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Repository
-        fields = ['id', 'git_url', 'git_branch']
+        fields = ['id', 'git_url', 'git_branch', 'project']
         read_only_fields = ['id']
 
     def validate_git_url(self, value):
         if not GIT_URL_PATTERN.match(value):
             raise serializers.ValidationError('Invalid git URL format.')
         return value
+
+    def validate(self, attrs):
+        project = attrs.get('project')
+        request = self.context.get('request')
+        if not (project and request and request.user.is_authenticated):
+            return attrs
+        is_member = project.memberships.filter(user=request.user).exists()
+        in_group = project.groups.filter(id__in=request.user.groups.all()).exists()
+        if not (is_member or in_group):
+            raise serializers.ValidationError(
+                {
+                    'project': 'You are not a member of this project.',
+                }
+            )
+        return attrs
 
     def create(self, validated_data):
         request = self.context.get('request')
@@ -29,26 +42,53 @@ class RepositoryCreateSerializer(serializers.ModelSerializer):
 
 class RepositorySerializer(serializers.ModelSerializer):
     assigned_projects = serializers.SlugRelatedField(
-        many=True, read_only=True, slug_field='id',
+        many=True,
+        read_only=True,
+        slug_field='id',
     )
     groups = serializers.SlugRelatedField(
-        many=True, slug_field='name', read_only=True,
+        many=True,
+        slug_field='name',
+        read_only=True,
     )
 
     class Meta:
         model = Repository
         fields = [
-            'id', 'git_url', 'git_branch', 'auto_pull',
-            'status', 'file_count', 'total_bytes', 'error_message', 'last_indexed_at',
-            'assigned_projects', 'groups', 'created_at', 'updated_at',
+            'id',
+            'git_url',
+            'git_branch',
+            'auto_pull',
+            'status',
+            'file_count',
+            'total_bytes',
+            'error_message',
+            'last_indexed_at',
+            'assigned_projects',
+            'groups',
+            'created_at',
+            'updated_at',
         ]
-        read_only_fields = ['id', 'status', 'file_count', 'total_bytes', 'error_message', 'last_indexed_at', 'assigned_projects', 'groups', 'created_at', 'updated_at']
+        read_only_fields = [
+            'id',
+            'status',
+            'file_count',
+            'total_bytes',
+            'error_message',
+            'last_indexed_at',
+            'assigned_projects',
+            'groups',
+            'created_at',
+            'updated_at',
+        ]
+
 
 class IndexedFileSerializer(serializers.ModelSerializer):
     class Meta:
         model = IndexedFile
         fields = ['id', 'file_path', 'language', 'file_hash', 'last_indexed_at']
         read_only_fields = ['id', 'last_indexed_at']
+
 
 class CodeChunkSerializer(serializers.ModelSerializer):
     file_path = serializers.CharField(source='file.file_path', read_only=True)
@@ -57,8 +97,17 @@ class CodeChunkSerializer(serializers.ModelSerializer):
     class Meta:
         model = CodeChunk
         fields = [
-            'id', 'file', 'file_path', 'chunk_type', 'start_line', 'end_line',
-            'content', 'tokens_count', 'parent_chunk', 'metadata', 'has_embedding',
+            'id',
+            'file',
+            'file_path',
+            'chunk_type',
+            'start_line',
+            'end_line',
+            'content',
+            'tokens_count',
+            'parent_chunk',
+            'metadata',
+            'has_embedding',
         ]
         read_only_fields = ['id', 'has_embedding']
 

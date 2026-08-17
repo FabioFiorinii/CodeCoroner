@@ -1,10 +1,13 @@
 from unittest.mock import patch
+
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
-from django.contrib.auth import get_user_model
+
 from projects.models import Project, ProjectMembership
-from repositories.models import Repository, IndexedFile, CodeChunk
+from repositories.models import CodeChunk, IndexedFile, Repository
 
 User = get_user_model()
 
@@ -119,6 +122,30 @@ class RepoCrudTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         repo.refresh_from_db()
         self.assertEqual(repo.git_branch, 'develop')
+
+    def test_12_list_repos_shared_via_group(self):
+        team = Group.objects.create(name='team')
+        repo = Repository.objects.create(
+            project=self.project, git_url='https://github.com/group/shared.git',
+        )
+        repo.groups.add(team)
+        self.other.groups.add(team)
+        self.client.force_authenticate(user=self.other)
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+
+    def test_13_superuser_sees_all_repos(self):
+        admin = User.objects.create_superuser(
+            email='adm@t.com', username='adm', password='pass12345',
+        )
+        self.client.force_authenticate(user=admin)
+        Repository.objects.create(project=self.project, git_url='https://github.com/a/b.git')
+        p2 = Project.objects.create(name='P2', created_by=self.other)
+        Repository.objects.create(project=p2, git_url='https://github.com/c/d.git')
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 2)
 
 
 class RepoActionTests(TestCase):

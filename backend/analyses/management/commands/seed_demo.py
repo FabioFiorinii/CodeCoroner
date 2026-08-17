@@ -3,18 +3,12 @@ from datetime import timedelta
 from django.utils import timezone
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from projects.models import Project, ProjectMembership
 from repositories.models import Repository
 from analyses.models import Analysis, AnalysisRun, BugLocalization, SuspiciousFileScore, RootCause, FixSuggestion, Report
+from .seed_base import ensure_base, ADMIN_EMAIL, ADMIN_PASSWORD
 
 User = get_user_model()
-
-DEMO_USER = {
-    'email': 'admin@codecoroner.dev',
-    'username': 'admin',
-    'password': 'adminadmin',
-}
 
 FIXED_NOW = timezone.now() - timedelta(hours=2)
 
@@ -25,35 +19,39 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         self.stdout.write('Seeding demo data...')
 
-        default_group, _ = Group.objects.get_or_create(name='default')
+        admin, default_group, _ = ensure_base()
+        self.stdout.write(f'  Base user: {admin.email}')
 
-        user, created = User.objects.get_or_create(
-            email=DEMO_USER['email'],
-            defaults={
-                'username': DEMO_USER['username'],
-            },
+        bob, _ = User.objects.get_or_create(
+            email='bob@codecoroner.dev',
+            defaults={'username': 'bob'},
         )
-        if created:
-            user.set_password(DEMO_USER['password'])
-            user.is_superuser = True
-            user.save()
-            self.stdout.write(f'  Created user: {user.email}')
-        else:
-            user.is_superuser = True
-            user.save(update_fields=['is_superuser'])
-            self.stdout.write(f'  Using existing user: {user.email}')
-        user.groups.add(default_group)
+        bob.is_superuser = True
+        bob.set_password('bobpass')
+        bob.save()
+        bob.groups.add(default_group)
+        self.stdout.write('  Test user: bob@codecoroner.dev (superuser)')
+
+        alice, _ = User.objects.get_or_create(
+            email='alice@codecoroner.dev',
+            defaults={'username': 'alice'},
+        )
+        alice.is_superuser = False
+        alice.set_password('alicepass')
+        alice.save()
+        alice.groups.add(default_group)
+        self.stdout.write('  Test user: alice@codecoroner.dev')
 
         project, _ = Project.objects.get_or_create(
             name='Flask Demo',
             defaults={
                 'description': 'Demo project analyzing a Flask web application for common bugs',
-                'created_by': user,
+                'created_by': admin,
             },
         )
         ProjectMembership.objects.get_or_create(
             project=project,
-            user=user,
+            user=admin,
             defaults={'role': 'owner'},
         )
         project.groups.add(default_group)
@@ -76,7 +74,7 @@ class Command(BaseCommand):
         analysis, created = Analysis.objects.get_or_create(
             id=analysis_id,
             defaults={
-                'user': user,
+                'user': admin,
                 'project': project,
                 'repository': repo,
                 'title': 'TemplateNotFound on index route',
@@ -120,7 +118,8 @@ jinja2.exceptions.TemplateNotFound: TemplateNotFound: index.html''',
             self.stdout.write(f'  Analysis already exists: {analysis.title}')
 
         self.stdout.write(self.style.SUCCESS(
-            f'\nDemo data ready! Login with: {DEMO_USER["email"]} / {DEMO_USER["password"]}'
+            f'\nDemo data ready! Login with: {ADMIN_EMAIL} / {ADMIN_PASSWORD} '
+            '(bob@codecoroner.dev / bobpass, alice@codecoroner.dev / alicepass)'
         ))
 
     def _create_runs(self, analysis):

@@ -2,9 +2,9 @@ FROM docker.io/python:3.13-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
+COPY requirements.txt requirements-dev.txt .
 RUN apt-get update && apt-get install -y --no-install-recommends gcc build-essential git libldap2-dev libsasl2-dev && \
-    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt && \
     apt-get purge -y gcc build-essential libldap2-dev libsasl2-dev && \
     apt-get autoremove -y && \
     apt-get install -y --no-install-recommends libldap2 libsasl2-2 && \
