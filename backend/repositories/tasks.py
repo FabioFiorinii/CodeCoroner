@@ -226,6 +226,12 @@ def generate_embeddings_task(self, repo_id: str):
 
     for i in range(0, total, batch_size):
         batch = list(chunks[i : i + batch_size])
+        non_empty = [c for c in batch if c.content and c.content.strip()]
+        if len(non_empty) != len(batch):
+            embedded += len(batch) - len(non_empty)
+            batch = non_empty
+        if not batch:
+            continue
         texts = [c.content for c in batch]
         chunk_ids = [str(c.id) for c in batch]
 
@@ -269,7 +275,8 @@ def generate_embeddings_task(self, repo_id: str):
 def _finish_index(repo: Repository):
     repo.status = Repository.Status.INDEXED
     repo.last_indexed_at = timezone.now()
-    repo.save(update_fields=['status', 'last_indexed_at'])
+    repo.error_message = ''
+    repo.save(update_fields=['status', 'last_indexed_at', 'error_message'])
     from webhooks.services import dispatch
 
     dispatch(

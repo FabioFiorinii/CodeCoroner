@@ -265,6 +265,27 @@ class EmbeddingTaskTests(TestCase):
             ChunkEmbedding.objects.filter(chunk=other).exists(),
         )
 
+    @patch('repositories.tasks._call_embed_api')
+    def test_skips_empty_content_chunks(self, mock_embed):
+        from repositories.tasks import generate_embeddings_task
+
+        empty = CodeChunk.objects.create(
+            file=self.indexed,
+            chunk_type='module',
+            start_line=4,
+            end_line=4,
+            content='   ',
+            tokens_count=0,
+        )
+        mock_embed.return_value = [[1.0] * 768]
+        generate_embeddings_task(str(self.repo.id))
+
+        self.assertEqual(ChunkEmbedding.objects.count(), 1)
+        self.assertFalse(ChunkEmbedding.objects.filter(chunk=empty).exists())
+        mock_embed.assert_called_once()
+        self.repo.refresh_from_db()
+        self.assertEqual(self.repo.status, Repository.Status.INDEXED)
+
 
 class DailyPullTests(TestCase):
     def setUp(self):
