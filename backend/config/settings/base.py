@@ -200,21 +200,21 @@ if os.environ.get('LDAP_SERVER_URI'):
 MODEL_TIERS = {
     'fast': {
         'label': 'Fast',
-        'llm_model': 'qwen2.5-coder:1.5b',
-        'rca_model': 'qwen2.5-coder:1.5b',
-        'params': '1.5B',
-    },
-    'balanced': {
-        'label': 'Balanced',
         'llm_model': 'qwen2.5-coder:3b',
         'rca_model': 'qwen2.5-coder:3b',
         'params': '3.1B',
     },
-    'precise': {
-        'label': 'Precise',
+    'balanced': {
+        'label': 'Balanced',
         'llm_model': 'qwen2.5-coder:7b',
         'rca_model': 'qwen2.5-coder:7b',
         'params': '7.6B',
+    },
+    'precise': {
+        'label': 'Precise',
+        'llm_model': 'qwen2.5-coder:14b',
+        'rca_model': 'qwen2.5-coder:14b',
+        'params': '14.8B',
     },
 }
 

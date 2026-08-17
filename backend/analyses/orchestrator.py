@@ -69,62 +69,79 @@ class AnalysisOrchestrator:
                 status='failed', completed_at=timezone.now(), error=error
             )
 
+    def _run_step(self, name, step_fn, status=None):
+        if status:
+            self._update_status(status)
+        self.current_step = name
+        self._record_run(name)
+        try:
+            step_fn()
+            self._mark_completed(name)
+            return True
+        except Exception as exc:
+            logger.exception(f'Step {name} failed for analysis {self.analysis.id}')
+            self._fail_current_step(str(exc))
+            return False
+
     def execute(self):
         start_time = time.time()
         try:
-            self._update_status(Analysis.Status.INDEXING)
-            self.current_step = 'ensure_repo_indexed'
-            self._record_run(self.current_step)
-            self._ensure_repo_indexed()
-            self._mark_completed(self.current_step)
-
-            self._update_status(Analysis.Status.ANALYZING)
-            self.current_step = 'analyze_input'
-            self._record_run(self.current_step)
-            self._analyze_input()
-            self._mark_completed(self.current_step)
-
-            self._update_status(Analysis.Status.BUG_LOCALIZATION)
-            self.current_step = 'bug_localization'
-            self._record_run(self.current_step)
-            self._localize_bug()
-            self._mark_completed(self.current_step)
-
-            self._update_status(Analysis.Status.RCA)
-            self.current_step = 'root_cause'
-            self._record_run(self.current_step)
-            self._root_cause()
-            self._mark_completed(self.current_step)
-
-            self.current_step = 'generate_report'
-            self._record_run(self.current_step)
-            self._generate_report()
-            self._mark_completed(self.current_step)
-
-            self._update_status(Analysis.Status.FIX_SUGGESTION)
-            self.current_step = 'fix_suggestion'
-            self._record_run(self.current_step)
-            self._suggest_fix()
-            self._mark_completed(self.current_step)
-
-            self._update_status(Analysis.Status.COMPLETED)
-            self.current_step = None
-            self._record_run('completed', status='completed')
-            dispatch(
-                self.analysis.project_id,
-                'analysis.completed',
-                {
-                    'id': str(self.analysis.id),
-                    'title': self.analysis.title,
-                    'status': self.analysis.status,
-                    'project': str(self.analysis.project_id),
-                    'duration_seconds': int(time.time() - start_time),
-                },
+            ok = True
+            ok &= self._run_step(
+                'ensure_repo_indexed', self._ensure_repo_indexed, Analysis.Status.INDEXING
             )
+            ok &= self._run_step('analyze_input', self._analyze_input, Analysis.Status.ANALYZING)
+            ok &= self._run_step(
+                'bug_localization', self._localize_bug, Analysis.Status.BUG_LOCALIZATION
+            )
+            ok &= self._run_step('root_cause', self._root_cause, Analysis.Status.RCA)
+            ok &= self._run_step('generate_report', self._generate_report)
+            ok &= self._run_step(
+                'fix_suggestion', self._suggest_fix, Analysis.Status.FIX_SUGGESTION
+            )
+
+            if ok:
+                self._update_status(Analysis.Status.COMPLETED)
+                self.current_step = None
+                self._record_run('completed', status='completed')
+                dispatch(
+                    self.analysis.project_id,
+                    'analysis.completed',
+                    {
+                        'id': str(self.analysis.id),
+                        'title': self.analysis.title,
+                        'status': self.analysis.status,
+                        'project': str(self.analysis.project_id),
+                        'duration_seconds': int(time.time() - start_time),
+                    },
+                )
+            else:
+                failed_steps = list(
+                    AnalysisRun.objects.filter(analysis=self.analysis, status='failed').values_list(
+                        'step', flat=True
+                    )
+                )
+                error = f'Some steps failed: {", ".join(failed_steps) or "unknown"}'
+                self.analysis.status = Analysis.Status.FAILED
+                self.analysis.error_message = error
+                with transaction.atomic():
+                    self.analysis.save(update_fields=['status', 'error_message'])
+                self.current_step = None
+                self._record_run('failed', status='failed', error=error)
+                dispatch(
+                    self.analysis.project_id,
+                    'analysis.failed',
+                    {
+                        'id': str(self.analysis.id),
+                        'title': self.analysis.title,
+                        'status': self.analysis.status,
+                        'project': str(self.analysis.project_id),
+                        'error': error,
+                    },
+                )
 
         except Exception as e:
             logger.exception(f'Analysis {self.analysis.id} failed')
-            self._fail_current_step(str(e))
             self.analysis.status = Analysis.Status.FAILED
             self.analysis.error_message = str(e)
             with transaction.atomic():
