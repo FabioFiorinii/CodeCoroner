@@ -42,6 +42,9 @@ htmlcov/
 # Backups (contain DB dumps with sensitive data)
 backups/
 
+# App log dir (JSON rotation)
+logs/
+
 # Secrets
 .secrets.baseline
 

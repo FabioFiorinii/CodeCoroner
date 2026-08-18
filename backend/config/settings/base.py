@@ -267,11 +267,25 @@ LOGGING = {
             'format': '{levelname} {asctime} {module} {message}',
             'style': '{',
         },
+        'json': {
+            '()': 'common.logging.JsonFormatter',
+        },
     },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
+        },
+        'console_json': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'json',
+        },
+        'app_file': {
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': str(BASE_DIR / 'logs' / 'app.log'),
+            'when': 'midnight',
+            'backupCount': 14,
+            'formatter': 'json',
         },
     },
     'root': {
@@ -279,3 +293,5 @@ LOGGING = {
         'level': os.environ.get('LOG_LEVEL', 'INFO'),
     },
 }
+
+(BASE_DIR / 'logs').mkdir(parents=True, exist_ok=True)

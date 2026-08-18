@@ -21,3 +21,4 @@ REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'] = {
 }
 
 LOGGING['root']['level'] = 'WARNING'
+LOGGING['root']['handlers'] = ['console_json', 'app_file']
