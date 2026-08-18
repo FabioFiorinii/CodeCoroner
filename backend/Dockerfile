@@ -17,7 +17,7 @@ COPY --chown=django:django . .
 ENV PYTHONUNBUFFERED=1 \
     DJANGO_SETTINGS_MODULE=config.settings.prod
 
-RUN python manage.py collectstatic --noinput --clear
+RUN DJANGO_SETTINGS_MODULE=config.settings.dev python manage.py collectstatic --noinput --clear
 
 EXPOSE 8000
 
