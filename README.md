@@ -41,7 +41,7 @@ Every stage can be **disabled from Admin → AI Pipeline**; disabled stages are 
                     └──────┬──────┘
                            │ HTTP / WebSocket
                     ┌──────▼──────┐
-                    │  Nginx      │  Reverse Proxy (Port 8080)
+                    │  Nginx      │  Reverse Proxy + TLS (8080 → 8443)
                     └──────┬──────┘
                ┌───────────┼───────────┐
                ▼           ▼           ▼
@@ -248,11 +248,13 @@ podman-compose exec ollama ollama pull nomic-embed-text
 
 ### Step 7: Apri nel browser
 
-- **Frontend**: http://localhost:8080
+- **Frontend**: https://localhost:8443 (HTTPS, certificato self-signed — accetta l'avviso del browser; `http://localhost:8080` reindirizza a HTTPS)
 - **API Django**: http://localhost:8000/api/v1/
 - **Admin Django**: http://localhost:8000/admin/
 - **MinIO Console**: http://localhost:9001
 - **Ollama API**: http://localhost:11434/api/tags
+
+> **HTTPS**: il certificato self-signed viene generato automaticamente al primo avvio di nginx e persiste nel volume `nginx_certs`. Per usare HSTS (strict-transport-security) in produzione impostare `ENABLE_HSTS=true` nel `.env`; per certificati reali montare cert/key in `infra/nginx/certs/server.crt|server.key` e, se si espone la 443, aggiornare la porta nel redirect di `infra/nginx/nginx.conf`.
 
 ### Comandi utili (Makefile)
 
@@ -393,7 +395,7 @@ GET  /api/v1/dashboard/activity/                 # Recent activity feed
 GET/PATCH /api/v1/auth/admin/model-settings/     # AI model tier + AI pipeline step toggles
 ```
 
-WebSocket: `ws://localhost:8080/ws/analyses/{id}/` (real-time status; stage completed/failed/skipped events)
+WebSocket: `wss://localhost:8443/ws/analyses/{id}/` (real-time status; stage completed/failed/skipped events; HTTP → `ws://localhost:8080/ws/...`)
 
 ## Development Status
 
@@ -417,11 +419,11 @@ WebSocket: `ws://localhost:8080/ws/analyses/{id}/` (real-time status; stage comp
 - **Logging** — structured JSON logs with daily rotation in prod (`LOGGING`, TimedRotatingFileHandler)
 - **Data lifecycle** — periodic purge via Celery beat (git GC, orphan repo dirs, analysis retention 90d) + pgvector **HNSW** index on embeddings
 - **Frontend tests** — Vitest wired up (28 tests: api client, auth store, status maps, utils, Button, Input)
+- **TLS/HTTPS** — nginx terminates TLS (self-signed cert auto-generated on `nginx_certs` volume), HTTP→HTTPS redirect, HSTS opt-in via `ENABLE_HSTS`, security headers + CSP
 - **Backend test suite** — 101 passing (projects CRUD, repos, analyses, webhooks, lockout, tenant isolation, cleanup, JSON logging)
 
 ### 🔜 Next
 - **Sandbox validation** — Wire the validation container into the pipeline (currently a stub; deferred)
-- **TLS/HTTPS** — Certificate termination on nginx + HSTS/CSP headers
 
 ### Deliberately out of scope
 - **CI/CD** — no GitHub Actions (no paid GitHub); reproducibility is manual via `make build`
@@ -431,7 +433,7 @@ WebSocket: `ws://localhost:8080/ws/analyses/{id}/` (real-time status; stage comp
 
 The codebase runs the full stack locally on Podman, but several **production gaps remain** before a public deployment. High-priority items:
 
-- **TLS**: nginx still serves plaintext on :8080; **security headers are in place** (X-Frame-Options, nosniff, Referrer-Policy, CSP) on both nginx layers, but HSTS/certificate termination remain.
+- **TLS**: nginx terminates TLS on **:8443** with an auto-generated self-signed cert and redirects HTTP→HTTPS; **security headers are in place** (X-Frame-Options, nosniff, Referrer-Policy, CSP) and **HSTS is available** via `ENABLE_HSTS=true`. For prod: mount real certs in `infra/nginx/certs/` (or `nginx_certs` volume), map 443, set `ENABLE_HSTS=true`, and update the redirect port in `nginx.conf`.
 - **Secrets**: with `config.settings.prod` the app **fails fast** if `DJANGO_SECRET_KEY`/`DB_PASSWORD` are missing or still set to the dev defaults; `.env` is gitignored; **webhook secrets are encrypted at rest** (Fernet, key from `WEBHOOK_SECRET_KEY` env, falling back to `DJANGO_SECRET_KEY`).
 - **Migrations**: applied explicitly via `make migrate` (no `makemigrations`/`migrate`/`seed_base` at container start anymore); the container starts `runserver` directly.
 - **Build reproducibility**: no CI — rebuild with `make build` after Dockerfile/requirements changes. Note that `podman-compose up -d` can silently reuse **stale images** (`backend/.dockerignore` was previously excluding `requirements-dev.txt`, breaking `make build`; fixed). The Dockerfile collects static with dev settings (prod settings fail fast on secrets, which would break the build step).

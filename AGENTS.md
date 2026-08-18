@@ -32,6 +32,7 @@ make seed-demo                 # demo/test data (bob, alice, Flask Demo project/
 - Indexing flow: `repositories/tasks.py` — clone/pull → tree-sitter chunking (`chunking.py`, `IGNORED_DIRS`/`IGNORED_EXTENSIONS` sets) → batch embed via ai-engine `/embed` (nomic-embed-text, 768-dim) → store in pgvector `ChunkEmbedding`.
 - Repos are cloned into `backend/media/repos/` (gitignored; `repo_cache` volume shared read-only with ai-engine). `backend/media/` and `backend/static/` are gitignored build/runtime dirs.
 - Settings split under `backend/config/settings/`: `dev` (used by compose, debug toolbar, no throttling), `prod` (Dockerfile default), `test` (used by pytest, `CELERY_TASK_ALWAYS_EAGER=True`, locmem cache). mypy is wired to `config.settings.dev` via pyproject.
+- nginx terminates TLS on **:8443** (HTTP :8080 → 301 redirect). Self-signed cert is generated on first start by `infra/nginx/entrypoint.sh` into the `nginx_certs` volume (openssl installed on the fly, not baked into the image). HSTS is off by default — enable with `ENABLE_HSTS=true`. Security headers + CSP live in `infra/nginx/nginx.conf`.
 - **`specs/*.md` are design docs that have drifted from the code** (e.g., they describe `analyses/tasks/` dirs and a gRPC agent server; actual code is `analyses/tasks.py` and plain HTTP). Use them for intent, but trust the code.
 
 ## Testing

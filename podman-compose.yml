@@ -20,6 +20,8 @@ volumes:
     driver: local
   static_volume:
     driver: local
+  nginx_certs:
+    driver: local
 
 services:
   postgres:
@@ -241,9 +243,14 @@ services:
   nginx:
     image: docker.io/nginx:alpine
     container_name: codecoroner-nginx
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
     volumes:
       - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro,Z
+      - ./infra/nginx/entrypoint.sh:/entrypoint.sh:ro,Z
       - static_volume:/static:ro,Z
+      - nginx_certs:/etc/nginx/certs
+    environment:
+      ENABLE_HSTS: ${ENABLE_HSTS:-false}
     depends_on:
       - django
       - frontend
@@ -252,3 +259,4 @@ services:
     restart: unless-stopped
     ports:
       - "8080:80"
+      - "8443:443"
