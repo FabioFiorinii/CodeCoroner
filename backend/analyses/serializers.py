@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from projects.models import Project
 from repositories.models import Repository
 
 from .models import (
@@ -177,9 +178,32 @@ class AnalysisCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('error_context must be a JSON object')
         return value
 
+    def _user_can_access(self, obj):
+        user = self.context.get('request').user
+        if user.is_superuser:
+            return True
+        if isinstance(obj, Project):
+            if obj.memberships.filter(user=user).exists():
+                return True
+            return obj.groups.filter(id__in=user.groups.all()).exists()
+        repo = obj
+        if repo.project and (
+            repo.project.memberships.filter(user=user).exists()
+            or repo.project.groups.filter(id__in=user.groups.all()).exists()
+        ):
+            return True
+        return repo.groups.filter(id__in=user.groups.all()).exists()
+
+    def validate_project(self, value):
+        if not self._user_can_access(value):
+            raise serializers.ValidationError('Project not found.')
+        return value
+
     def validate_parent_analysis(self, value):
         parent = Analysis.objects.filter(id=value).first()
         if parent is None:
+            raise serializers.ValidationError('Parent analysis not found.')
+        if not self._user_can_access(parent.project):
             raise serializers.ValidationError('Parent analysis not found.')
         project = self.initial_data.get('project')
         if project and str(parent.project_id) != str(project):
@@ -195,6 +219,11 @@ class AnalysisCreateSerializer(serializers.ModelSerializer):
             repo_ids.add(rid)
         if repo_ids:
             repos = Repository.objects.filter(id__in=repo_ids)
+            for repo in repos:
+                if not self._user_can_access(repo):
+                    raise serializers.ValidationError(
+                        f'Repository "{repo.git_url}" is not accessible.'
+                    )
             for repo in repos:
                 if repo.status != Repository.Status.INDEXED:
                     raise serializers.ValidationError(
