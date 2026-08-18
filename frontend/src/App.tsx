@@ -18,12 +18,14 @@ import { AdminPage } from './pages/AdminPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { Toaster } from './components/common/Toaster'
 import { ConfirmDialog } from './components/common/ConfirmDialog'
+import { AnalysisNotificationListener } from './components/common/AnalysisNotificationListener'
 
 function App() {
   return (
     <BrowserRouter>
       <Toaster />
       <ConfirmDialog />
+      <AnalysisNotificationListener />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />

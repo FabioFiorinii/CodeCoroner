@@ -14,6 +14,7 @@ class Analysis(models.Model):
         PATCHING = 'patching'
         VALIDATING = 'validating'
         FIX_SUGGESTION = 'fix_suggestion'
+        GENERATE_REPORT = 'generate_report'
         COMPLETED = 'completed'
         FAILED = 'failed'
 

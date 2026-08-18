@@ -63,7 +63,7 @@ export interface Analysis {
 export type AnalysisStatus =
   | 'queued' | 'indexing' | 'analyzing'
   | 'bug_localization' | 'rca'
-  | 'patching' | 'validating' | 'fix_suggestion'
+  | 'patching' | 'validating' | 'fix_suggestion' | 'generate_report'
   | 'completed' | 'failed'
 
 export interface ErrorContext {

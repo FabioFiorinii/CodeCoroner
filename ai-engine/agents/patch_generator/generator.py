@@ -1,6 +1,7 @@
 import json
 import logging
 from agents.base_agent import BaseAgent
+from agents.json_utils import parse_json_response
 
 logger = logging.getLogger(__name__)
 
@@ -62,9 +63,9 @@ class PatchGenerator(BaseAgent):
         )
         try:
             raw = await self.ollama.generate(
-                self.settings.rca_model, prompt, format='json', options={'num_predict': 600}
+                self.settings.rca_model, prompt, format='json', options={'num_predict': 1500}
             )
-            result = self._parse_json(raw)
+            result = parse_json_response(raw)
             result.setdefault('status', 'ok')
             result.setdefault('diff', '')
             result.setdefault('plan', '')
@@ -79,17 +80,3 @@ class PatchGenerator(BaseAgent):
                 'plan': '',
                 'explanation': '',
             }
-
-    def _parse_json(self, raw: str) -> dict:
-        raw = raw.strip()
-        if raw.startswith('```'):
-            raw = raw.split('\n', 1)[-1]
-            if '```' in raw:
-                raw = raw.rsplit('```', 1)[0]
-        raw = raw.strip()
-        start = raw.find('{')
-        end = raw.rfind('}')
-        if start != -1 and end != -1:
-            raw = raw[start:end+1]
-        raw = ''.join(c for c in raw if c.isprintable() or c in '\n\r\t ')
-        return json.loads(raw)

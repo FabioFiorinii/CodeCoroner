@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, Clock, CheckCircle2, AlertCircle, Loader2,
@@ -10,9 +10,9 @@ import {
   useCreateAnalysis, useProjectAssignedRepos,
 } from '../lib/queries'
 import { AnalysisForm } from '../components/AnalysisForm'
-import { toast } from '../lib/toast'
 import { confirmDialog } from '../lib/confirm'
 import { useAuthStore } from '../stores/authStore'
+import { useAnalysisWatch } from '../lib/analysisWatch'
 import { Card } from '../components/common/Card'
 import { Button } from '../components/common/Button'
 
@@ -23,6 +23,7 @@ const STATUS_ICON: Record<string, typeof Clock> = {
   bug_localization: Loader2,
   rca: Loader2,
   fix_suggestion: Loader2,
+  generate_report: Loader2,
   completed: CheckCircle2,
   failed: AlertCircle,
 }
@@ -34,6 +35,7 @@ const STATUS_COLOR: Record<string, string> = {
   bug_localization: 'text-purple-600 bg-purple-50 border-purple-200',
   rca: 'text-purple-600 bg-purple-50 border-purple-200',
   fix_suggestion: 'text-amber-600 bg-amber-50 border-amber-200',
+  generate_report: 'text-sky-600 bg-sky-50 border-sky-200',
   completed: 'text-green-600 bg-green-50 border-green-200',
   failed: 'text-red-600 bg-red-50 border-red-200',
 }
@@ -58,26 +60,13 @@ export function AnalysisDetailPage() {
   const rootId = analysis?.parent_analysis ?? analysis?.id
   const { data: thread } = useAnalysisThread(rootId)
   const { data: projectRepos } = useProjectAssignedRepos(projectId)
+  const watch = useAnalysisWatch((s) => s.watch)
 
-  const prevStatus = useRef<string | null>(null)
   useEffect(() => {
-    const current = analysis?.status
-    if (!current) return
-    const prev = prevStatus.current
-    if (prev && prev !== current && (current === 'completed' || current === 'failed')) {
-      toast(
-        current === 'completed'
-          ? `Analysis "${analysis.title}" completed`
-          : `Analysis "${analysis.title}" failed`,
-        {
-          type: current === 'completed' ? 'success' : 'error',
-          href: `/projects/${projectId}/analyses/${analysis.id}`,
-          linkText: current === 'completed' ? 'Open analysis' : 'View details',
-        },
-      )
+    if (analysis?.id && !['completed', 'failed'].includes(analysis.status)) {
+      watch(analysis.id)
     }
-    prevStatus.current = current
-  }, [analysis])
+  }, [analysis?.id, analysis?.status, watch])
 
   if (isLoading) {
     return (
@@ -106,7 +95,7 @@ export function AnalysisDetailPage() {
   }
 
   const StatusIcon = STATUS_ICON[analysis.status] || Clock
-  const isBusy = ['queued', 'indexing', 'analyzing', 'bug_localization', 'rca', 'fix_suggestion'].includes(analysis.status)
+  const isBusy = ['queued', 'indexing', 'analyzing', 'bug_localization', 'rca', 'fix_suggestion', 'generate_report'].includes(analysis.status)
 
   const threadPos = thread?.findIndex((t) => t.id === analysis.id) ?? -1
   const retryRepos = analysis.repositories?.length
@@ -330,21 +319,27 @@ export function AnalysisDetailPage() {
           Pipeline Steps
         </h3>
         <div className="space-y-1">
-          {['ensure_repo_indexed', 'analyze_input', 'bug_localization', 'root_cause', 'generate_report', 'fix_suggestion', 'completed'].map((step) => {
+          {['ensure_repo_indexed', 'analyze_input', 'bug_localization', 'root_cause', 'fix_suggestion', 'generate_report', 'completed'].map((step) => {
             const run = analysis.runs?.find((r) => r.step === step)
-            if (!run && step !== 'completed') return null
+            const stepDone = run?.status === 'completed'
+            const stepFailed = run?.status === 'failed'
+            const stepRunning = run?.status === 'running'
+            const pending = !run || (!stepDone && !stepFailed && !stepRunning)
             return (
               <div key={step} className="flex items-center gap-3 text-sm py-1.5">
-                {!run ? (
-                  <div className="w-2 h-2 rounded-full bg-gray-300 shrink-0" />
-                ) : run.status === 'completed' ? (
+                {stepDone ? (
                   <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
-                ) : run.status === 'failed' ? (
+                ) : stepFailed ? (
                   <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
-                ) : (
+                ) : stepRunning ? (
                   <Loader2 className="w-4 h-4 text-blue-500 animate-spin shrink-0" />
+                ) : (
+                  <div className="w-2 h-2 rounded-full bg-gray-300 shrink-0" />
                 )}
-                <span className="capitalize">{step.replace(/_/g, ' ')}</span>
+                <span className={`capitalize ${pending ? 'text-text-muted' : ''}`}>
+                  {step === 'completed' ? 'Completed' : step.replace(/_/g, ' ')}
+                </span>
+                {pending && <span className="text-xs text-text-muted">pending</span>}
                 {run?.error && <span className="text-red-500 text-xs ml-auto">{run.error}</span>}
               </div>
             )
@@ -521,6 +516,7 @@ export function AnalysisDetailPage() {
                       parent_analysis: rootId,
                     })
                     setShowRetryModal(false)
+                    watch(result.id)
                     navigate(`/projects/${projectId}/analyses/${result.id}`)
                   } catch (err) {
                     setRetryError(

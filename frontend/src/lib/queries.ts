@@ -328,7 +328,7 @@ export function useAnalysis(id: string | undefined) {
     queryFn: () => api.get(`/analyses/${id}/`),
     enabled: !!id,
     refetchInterval: (query) =>
-      ['queued', 'indexing', 'analyzing', 'bug_localization', 'rca', 'patching', 'fix_suggestion'].includes(query.state.data?.status ?? '')
+      ['queued', 'indexing', 'analyzing', 'bug_localization', 'rca', 'patching', 'fix_suggestion', 'generate_report'].includes(query.state.data?.status ?? '')
         ? 3000
         : false,
   })

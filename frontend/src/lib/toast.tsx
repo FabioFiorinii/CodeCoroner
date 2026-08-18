@@ -27,7 +27,7 @@ function subscribe(listener: Listener) {
 
 export function toast(
   message: string,
-  options: { type?: ToastItem['type']; href?: string; linkText?: string } = {},
+  options: { type?: ToastItem['type']; href?: string; linkText?: string; duration?: number } = {},
 ) {
   const item: ToastItem = {
     id: nextId++,
@@ -38,7 +38,7 @@ export function toast(
   }
   toasts = [...toasts, item]
   emit()
-  window.setTimeout(() => dismissToast(item.id), 6000)
+  window.setTimeout(() => dismissToast(item.id), options.duration ?? 12000)
 }
 
 export function dismissToast(id: number) {

@@ -139,9 +139,11 @@ class AnalysisOrchestrator:
                 'bug_localization', self._localize_bug, Analysis.Status.BUG_LOCALIZATION
             )
             ok &= self._run_step('root_cause', self._root_cause, Analysis.Status.RCA)
-            ok &= self._run_step('generate_report', self._generate_report)
             ok &= self._run_step(
                 'fix_suggestion', self._suggest_fix, Analysis.Status.FIX_SUGGESTION
+            )
+            ok &= self._run_step(
+                'generate_report', self._generate_report, Analysis.Status.GENERATE_REPORT
             )
 
             if ok:
@@ -442,6 +444,15 @@ class AnalysisOrchestrator:
                 'reasoning': rc.reasoning,
             }
 
+        fix = None
+        if hasattr(self.analysis, 'fix_suggestion'):
+            fs = self.analysis.fix_suggestion
+            fix = {
+                'diff': fs.diff,
+                'plan': fs.plan,
+                'explanation': fs.explanation,
+            }
+
         repo_info = {
             'id': str(self.analysis.repository.id),
             'git_url': self.analysis.repository.git_url,
@@ -454,6 +465,7 @@ class AnalysisOrchestrator:
             'log_analysis': self.log_analysis,
             'bug_localization': bug_loc,
             'root_cause': rca,
+            'fix_suggestion': fix,
             'repository': repo_info,
         }
 

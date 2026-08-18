@@ -4,12 +4,14 @@ import { ArrowLeft } from 'lucide-react'
 import { AnalysisForm } from '../components/AnalysisForm'
 import { Card } from '../components/common/Card'
 import { useProjectAssignedRepos, useCreateAnalysis } from '../lib/queries'
+import { useAnalysisWatch } from '../lib/analysisWatch'
 
 export function AnalysisNewPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
   const { data: reposData } = useProjectAssignedRepos(projectId)
   const createAnalysis = useCreateAnalysis()
+  const watch = useAnalysisWatch((s) => s.watch)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const repos = reposData ?? []
 
@@ -35,6 +37,7 @@ export function AnalysisNewPage() {
             setSubmitError(null)
             try {
               const result = await createAnalysis.mutateAsync(input)
+              watch(result.id)
               navigate(`/projects/${projectId}/analyses/${result.id}`)
             } catch (err) {
               setSubmitError(err instanceof Error ? err.message : 'Failed to start analysis.')

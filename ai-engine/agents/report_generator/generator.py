@@ -1,29 +1,46 @@
 import json
 import logging
 from agents.base_agent import BaseAgent
+from agents.json_utils import parse_json_response
 
 logger = logging.getLogger(__name__)
 
-REPORT_PROMPT = """You are a technical report writer. Generate a CONCISE bug analysis report in Markdown format.
+REPORT_PROMPT = """You are a technical report writer. Write a bug analysis report in Markdown that summarizes the findings of the whole analysis pipeline.
 
 Repo Overview:
 {repo_profile}
 
-Analysis Data:
+Analysis Data (results of each pipeline step):
 {analysis_data}
 
-Generate a short Markdown report (max 250 words total) with these sections:
-1. **Summary** - 1-2 sentences
-2. **Error Context** - error message and environment in one line
-3. **Root Cause** - root file/line and cause in 2-3 sentences
-4. **Fix Direction** - recommended next steps as a short bullet list
+Write a Markdown report (300-450 words) with these sections:
+## Summary
+2-3 sentences: what failed, in which component, and the overall verdict.
 
-Do not repeat the full error context or stacktrace. Be direct and skip fluff.
+## Error Context
+One short paragraph: the error message, where it was raised (file:line from the stacktrace), and the environment.
+
+## Log Analysis
+2-3 sentences on the key findings from the log/stacktrace analysis step.
+
+## Bug Localization
+A short bullet list of the top suspicious files with their suspicion score. Highlight the file ranked first.
+
+## Root Cause
+Root file and line, the causal chain, and confidence. Use the findings of the root cause step verbatim where possible.
+
+## Fix Direction
+A short bullet list of recommended next steps based on the fix suggestion step (diff, plan, explanation). If the fix suggestion is missing, note what to investigate.
+
+Rules:
+- Ground every claim in the Analysis Data. Do NOT invent details, file names, or line numbers that are not present.
+- Prefer source files over test files when describing the root cause.
+- Be direct; skip filler.
 
 Return ONLY valid JSON with this structure:
 {{
   "title": "string - short report title",
-  "markdown": "string - concise Markdown report"
+  "markdown": "string - the full Markdown report"
 }}"""
 
 
@@ -35,9 +52,9 @@ class ReportGenerator(BaseAgent):
         )
         try:
             raw = await self.ollama.generate(
-                self.settings.llm_model, prompt, format='json', options={'num_predict': 450}
+                self.settings.llm_model, prompt, format='json', options={'num_predict': 1000}
             )
-            result = self._parse_json(raw)
+            result = parse_json_response(raw)
             result.setdefault('status', 'ok')
             if not result.get('markdown'):
                 result['markdown'] = f"# Bug Analysis Report\n\n{raw}"
@@ -50,17 +67,3 @@ class ReportGenerator(BaseAgent):
                 'title': 'Bug Analysis Report',
                 'markdown': f"# Bug Analysis Report\n\nReport generation failed: {exc}",
             }
-
-    def _parse_json(self, raw: str) -> dict:
-        raw = raw.strip()
-        if raw.startswith('```'):
-            raw = raw.split('\n', 1)[-1]
-            if '```' in raw:
-                raw = raw.rsplit('```', 1)[0]
-        raw = raw.strip()
-        start = raw.find('{')
-        end = raw.rfind('}')
-        if start != -1 and end != -1:
-            raw = raw[start:end+1]
-        raw = ''.join(c for c in raw if c.isprintable() or c in '\n\r\t ')
-        return json.loads(raw)

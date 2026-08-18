@@ -11,10 +11,13 @@ class OllamaClient:
         self.client = httpx.AsyncClient(base_url=base_url, timeout=600.0)
 
     async def generate(self, model: str, prompt: str, **kwargs) -> str:
+        options = dict(kwargs.pop('options', {}) or {})
+        options.setdefault('temperature', 0)
         response = await self.client.post('/api/generate', json={
             'model': model,
             'prompt': prompt,
             'stream': False,
+            'options': options,
             **kwargs,
         })
         response.raise_for_status()

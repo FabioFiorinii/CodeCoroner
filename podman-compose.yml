@@ -82,6 +82,7 @@ services:
       - ollama_models:/root/.ollama:Z
     environment:
       OLLAMA_HOST: 0.0.0.0
+      OLLAMA_KEEP_ALIVE: 30m
     networks:
       - codecoroner_net
     restart: unless-stopped
