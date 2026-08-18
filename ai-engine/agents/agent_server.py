@@ -1,3 +1,4 @@
+import json
 import logging
 import time
 from contextlib import asynccontextmanager
@@ -31,6 +32,21 @@ patch_gen = PatchGenerator()
 _installed_cache: set[str] | None = None
 _installed_cache_at = 0.0
 INSTALLED_TTL = 30.0
+
+MAX_PAYLOAD_CHARS = 200_000
+
+
+def _validate_input_size(*parts) -> None:
+    total = 0
+    for part in parts:
+        if part is None:
+            continue
+        total += len(json.dumps(part, default=str, ensure_ascii=False))
+        if total > MAX_PAYLOAD_CHARS:
+            raise HTTPException(
+                status_code=400,
+                detail=f'Request payload too large (>{MAX_PAYLOAD_CHARS} chars)',
+            )
 
 
 async def installed_models():
@@ -217,6 +233,7 @@ async def index(req: IndexRequest):
 @app.post('/analyze-logs')
 async def analyze_logs(req: AnalyzeLogsRequest):
     try:
+        _validate_input_size(req.error_context, req.repo_profile)
         model = await resolve_model(req.model, settings.llm_model)
         log_analyzer.settings.llm_model = model
         result = await log_analyzer.run(req.error_context, repo_profile=req.repo_profile)
@@ -233,6 +250,7 @@ async def analyze_logs(req: AnalyzeLogsRequest):
 @app.post('/localize-bug')
 async def localize_bug(req: LocalizeBugRequest):
     try:
+        _validate_input_size(req.error_context, req.log_analysis, req.chunks, req.repo_profile)
         model = await resolve_model(req.model, settings.llm_model)
         bug_localizer.settings.llm_model = model
         result = await bug_localizer.run(
@@ -255,6 +273,9 @@ async def localize_bug(req: LocalizeBugRequest):
 @app.post('/analyze-root-cause')
 async def analyze_root_cause(req: RootCauseRequest):
     try:
+        _validate_input_size(
+            req.error_context, req.log_analysis, req.suspicious_files, req.chunks, req.repo_profile
+        )
         model = await resolve_model(req.model, settings.rca_model)
         rca_agent.settings.rca_model = model
         result = await rca_agent.run(
@@ -278,6 +299,14 @@ async def analyze_root_cause(req: RootCauseRequest):
 @app.post('/suggest-fix')
 async def suggest_fix(req: SuggestFixRequest):
     try:
+        _validate_input_size(
+            req.error_context,
+            req.log_analysis,
+            req.bug_localization,
+            req.root_cause,
+            req.chunks,
+            req.repo_profile,
+        )
         model = await resolve_model(req.model, settings.rca_model)
         patch_gen.settings.rca_model = model
         result = await patch_gen.run(
@@ -301,6 +330,7 @@ async def suggest_fix(req: SuggestFixRequest):
 @app.post('/generate-report')
 async def generate_report(req: ReportRequest):
     try:
+        _validate_input_size(req.analysis_data, req.repo_profile)
         model = await resolve_model(req.model, settings.llm_model)
         report_gen.settings.llm_model = model
         result = await report_gen.run(req.analysis_data, repo_profile=req.repo_profile)

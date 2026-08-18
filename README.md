@@ -431,7 +431,7 @@ The codebase runs the full stack locally on Podman, but several **production gap
 - **Observability**: console logging only; no Sentry, Prometheus or Celery failure alerting.
 - **Queue hardening**: `acks_late` + `reject_on_worker_lost` (tasks are redelivered if a worker dies mid-run) and a dedicated `llm` queue so long analyses don't block short tasks. Still open: no dead-letter queue, Celery beat runs with no scheduled tasks.
 - **Data lifecycle**: no git GC, no cleanup for orphaned repos/embeddings, no pgvector index on embeddings (fine at current scale).
-- **Input limits**: ai-engine has no size limits on logs/stacktraces (prompt-injection surface).
+- **Input limits**: ai-engine rejects payloads over 200k chars on the analysis endpoints (400) — bounds prompt-injection surface and runaway costs.
 
 See `specs/*.md` for design intent — some files have drifted from the current code (trust the code).
 
