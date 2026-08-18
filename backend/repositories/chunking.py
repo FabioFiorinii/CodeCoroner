@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Optional
+from typing import Any
 
 LANGUAGE_MAP = {
     '.py': 'python',
@@ -79,12 +79,12 @@ class SemanticChunker:
     def __init__(self):
         self.parsers = {}
 
-    def detect_language(self, file_path: str) -> Optional[str]:
+    def detect_language(self, file_path: str) -> str | None:
         ext = Path(file_path).suffix
         return LANGUAGE_MAP.get(ext)
 
     def chunk_file(self, file_path: str, content: str, language: str) -> list[dict]:
-        chunks = []
+        chunks: list[dict[str, Any]] = []
         lines = content.split('\n')
         total_lines = len(lines)
 

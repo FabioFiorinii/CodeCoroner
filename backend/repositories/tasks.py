@@ -178,7 +178,7 @@ def _chunk_source(
 
 
 def _save_chunks(indexed_file: IndexedFile, chunk_data: list[dict]):
-    parent_map = {}
+    parent_map: dict[str, CodeChunk] = {}
     for data in chunk_data:
         chunk_type = data.get('chunk_type', 'block')
         ct_map = {
@@ -237,7 +237,7 @@ def generate_embeddings_task(self, repo_id: str):
         if not batch:
             continue
         texts = [c.content for c in batch]
-        chunk_ids = [str(c.id) for c in batch]
+        chunk_ids = [c.id for c in batch]
 
         try:
             vectors = _call_embed_api(texts)

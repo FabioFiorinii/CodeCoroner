@@ -1,5 +1,6 @@
 from django.template.loader import render_to_string
 
+
 class ReportService:
     def generate_markdown(self, analysis) -> str:
         context = {
@@ -15,4 +16,4 @@ class ReportService:
         return md.markdown(markdown, extensions=['fenced_code', 'tables'])
 
     def generate_pdf(self, html: str) -> bytes:
-        pass
+        raise NotImplementedError
