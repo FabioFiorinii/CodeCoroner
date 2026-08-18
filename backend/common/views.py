@@ -53,8 +53,22 @@ class ModelSettingsSerializer(serializers.Serializer):
     tier = serializers.ChoiceField(choices=list(settings.MODEL_TIERS.keys()))
 
 
+PIPELINE_STEPS = [
+    'analyze_input',
+    'bug_localization',
+    'root_cause',
+    'fix_suggestion',
+    'generate_report',
+]
+
+
 class ModelSettingsView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsSuperUser]
+
+    @staticmethod
+    def _pipeline_map(setting):
+        disabled = set(setting.disabled_pipeline_steps or [])
+        return {step: step not in disabled for step in PIPELINE_STEPS}
 
     def _installed_models(self):
         try:
@@ -99,6 +113,29 @@ class ModelSettingsView(APIView):
             'tier': setting.model_tier,
             'model': settings.MODEL_TIERS[setting.model_tier]['llm_model'],
             'available': available,
+            'pipeline': self._pipeline_map(setting),
+        })
+
+    def patch(self, request):
+        payload = request.data.get('pipeline')
+        if not isinstance(payload, dict):
+            return Response(
+                {'detail': 'pipeline must be an object mapping step -> enabled boolean'},
+                status=400,
+            )
+        invalid = [key for key in payload if key not in PIPELINE_STEPS]
+        if invalid:
+            return Response(
+                {'detail': f'Unknown pipeline steps: {", ".join(invalid)}'},
+                status=400,
+            )
+        disabled = [step for step, enabled in payload.items() if not enabled]
+        setting = PlatformSetting.get_solo()
+        setting.disabled_pipeline_steps = disabled
+        setting.save(update_fields=['disabled_pipeline_steps', 'updated_at'])
+        return Response({
+            'detail': 'Pipeline settings saved',
+            'pipeline': self._pipeline_map(setting),
         })
 
     def put(self, request):

@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, Clock, CheckCircle2, AlertCircle, Loader2,
   FileCode, Target, FileSearch, BookOpen, Wrench, GitBranch, Globe,
-  FileText, Trash2, Plus, X, ChevronLeft, ChevronRight,
+  FileText, Trash2, Plus, X, ChevronLeft, ChevronRight, Ban,
 } from 'lucide-react'
 import {
   useAnalysis, useDeleteAnalysis, useAnalysisThread, useDeleteAnalysisThread,
@@ -324,7 +324,8 @@ export function AnalysisDetailPage() {
             const stepDone = run?.status === 'completed'
             const stepFailed = run?.status === 'failed'
             const stepRunning = run?.status === 'running'
-            const pending = !run || (!stepDone && !stepFailed && !stepRunning)
+            const stepSkipped = run?.status === 'skipped'
+            const pending = !run || (!stepDone && !stepFailed && !stepRunning && !stepSkipped)
             return (
               <div key={step} className="flex items-center gap-3 text-sm py-1.5">
                 {stepDone ? (
@@ -333,6 +334,8 @@ export function AnalysisDetailPage() {
                   <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
                 ) : stepRunning ? (
                   <Loader2 className="w-4 h-4 text-blue-500 animate-spin shrink-0" />
+                ) : stepSkipped ? (
+                  <Ban className="w-4 h-4 text-text-muted shrink-0" />
                 ) : (
                   <div className="w-2 h-2 rounded-full bg-gray-300 shrink-0" />
                 )}
@@ -340,6 +343,7 @@ export function AnalysisDetailPage() {
                   {step === 'completed' ? 'Completed' : step.replace(/_/g, ' ')}
                 </span>
                 {pending && <span className="text-xs text-text-muted">pending</span>}
+                {stepSkipped && <span className="text-xs text-text-muted">disabled</span>}
                 {run?.error && <span className="text-red-500 text-xs ml-auto">{run.error}</span>}
               </div>
             )

@@ -34,6 +34,7 @@ A short bullet list of recommended next steps based on the fix suggestion step (
 
 Rules:
 - Ground every claim in the Analysis Data. Do NOT invent details, file names, or line numbers that are not present.
+- Some pipeline steps may be DISABLED: if a section's data is missing, null, or empty, write one short sentence that the step was not run (e.g. "Root cause analysis was disabled for this run") and skip that section's details. Never fabricate findings for a missing step.
 - Prefer source files over test files when describing the root cause.
 - Be direct; skip filler.
 

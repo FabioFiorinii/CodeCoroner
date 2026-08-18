@@ -69,6 +69,16 @@ class AnalysisOrchestrator:
         self.current_step = None
         self.model_llm, self.model_rca = self._resolve_models()
         self.repo_profile = self._load_repo_profile()
+        self.log_analysis = None
+        self.disabled_steps = self._load_disabled_steps()
+
+    def _load_disabled_steps(self) -> set:
+        try:
+            from common.models import PlatformSetting
+
+            return set(PlatformSetting.get_solo().disabled_pipeline_steps or [])
+        except Exception:
+            return set()
 
     def _load_repo_profile(self) -> str:
         try:
@@ -140,6 +150,25 @@ class AnalysisOrchestrator:
             self._fail_current_step(str(exc))
             return False
 
+    def _skip_step(self, name):
+        self.current_step = name
+        AnalysisRun.objects.update_or_create(
+            analysis=self.analysis,
+            step=name,
+            defaults={
+                'status': AnalysisRun.Status.SKIPPED,
+                'output': {'status': 'disabled'},
+                'completed_at': timezone.now(),
+            },
+        )
+        self._broadcast_status()
+
+    def _run_step_if_enabled(self, name, status, step_fn):
+        if name in self.disabled_steps:
+            self._skip_step(name)
+            return True
+        return self._run_step(name, step_fn, status)
+
     def execute(self):
         start_time = time.time()
         try:
@@ -147,16 +176,20 @@ class AnalysisOrchestrator:
             ok &= self._run_step(
                 'ensure_repo_indexed', self._ensure_repo_indexed, Analysis.Status.INDEXING
             )
-            ok &= self._run_step('analyze_input', self._analyze_input, Analysis.Status.ANALYZING)
-            ok &= self._run_step(
-                'bug_localization', self._localize_bug, Analysis.Status.BUG_LOCALIZATION
+            ok &= self._run_step_if_enabled(
+                'analyze_input', Analysis.Status.ANALYZING, self._analyze_input
             )
-            ok &= self._run_step('root_cause', self._root_cause, Analysis.Status.RCA)
-            ok &= self._run_step(
-                'fix_suggestion', self._suggest_fix, Analysis.Status.FIX_SUGGESTION
+            ok &= self._run_step_if_enabled(
+                'bug_localization', Analysis.Status.BUG_LOCALIZATION, self._localize_bug
             )
-            ok &= self._run_step(
-                'generate_report', self._generate_report, Analysis.Status.GENERATE_REPORT
+            ok &= self._run_step_if_enabled(
+                'root_cause', Analysis.Status.RCA, self._root_cause
+            )
+            ok &= self._run_step_if_enabled(
+                'fix_suggestion', Analysis.Status.FIX_SUGGESTION, self._suggest_fix
+            )
+            ok &= self._run_step_if_enabled(
+                'generate_report', Analysis.Status.GENERATE_REPORT, self._generate_report
             )
 
             if ok:

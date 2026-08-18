@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Shield, Users, UserX, Save, Plus, X, Search, Sparkles, Download } from 'lucide-react'
+import { Shield, Users, UserX, Save, Plus, X, Search, Sparkles, Download, Workflow } from 'lucide-react'
 import { Card } from '../components/common/Card'
 import { Button } from '../components/common/Button'
 import { useAuthStore } from '../stores/authStore'
@@ -35,9 +35,18 @@ interface ModelSettings {
   tier: string
   model: string
   available: ModelOption[]
+  pipeline: Record<string, boolean>
 }
 
 const TIER_KEYS = ['fast', 'balanced', 'precise']
+
+const PIPELINE_STEPS_UI = [
+  { key: 'analyze_input', label: 'Log Analysis' },
+  { key: 'bug_localization', label: 'Bug Localization' },
+  { key: 'root_cause', label: 'Root Cause Analysis' },
+  { key: 'fix_suggestion', label: 'Fix Suggestion' },
+  { key: 'generate_report', label: 'Report Generation' },
+]
 
 export function AdminPage() {
   const { user } = useAuthStore()
@@ -55,6 +64,10 @@ export function AdminPage() {
   const [savingModels, setSavingModels] = useState(false)
   const [saveModelError, setSaveModelError] = useState<string | null>(null)
   const [saveModelSuccess, setSaveModelSuccess] = useState<string | null>(null)
+  const [pipeline, setPipeline] = useState<Record<string, boolean>>({})
+  const [savingPipeline, setSavingPipeline] = useState(false)
+  const [savePipelineError, setSavePipelineError] = useState<string | null>(null)
+  const [savePipelineSuccess, setSavePipelineSuccess] = useState<string | null>(null)
 
   useEffect(() => {
     if (!user?.is_superuser) {
@@ -70,6 +83,7 @@ export function AdminPage() {
       const data = await api.get<ModelSettings>('/auth/admin/model-settings/')
       setModelSettings(data)
       setTierIndex(TIER_KEYS.indexOf(data.tier) >= 0 ? TIER_KEYS.indexOf(data.tier) : 1)
+      setPipeline(data.pipeline ?? {})
     } catch (err) {
       console.error('Failed to load model settings', err)
     }
@@ -180,6 +194,33 @@ export function AdminPage() {
 
   const selectedTier = modelSettings?.available.find((a) => a.key === TIER_KEYS[tierIndex]) ?? null
 
+  const togglePipelineStep = (key: string) => {
+    setPipeline((prev) => ({ ...prev, [key]: !prev[key] }))
+    setSavePipelineSuccess(null)
+  }
+
+  const handleSavePipeline = async () => {
+    setSavingPipeline(true)
+    setSavePipelineError(null)
+    setSavePipelineSuccess(null)
+    try {
+      const res = await api.patch<{ detail: string; pipeline: Record<string, boolean> }>(
+        '/auth/admin/model-settings/',
+        { pipeline },
+      )
+      setSavePipelineSuccess(res.detail || 'Pipeline settings saved')
+      setPipeline(res.pipeline)
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? ((err.body as { detail?: string } | null)?.detail as string) || err.message
+          : 'Failed to save pipeline settings'
+      setSavePipelineError(message)
+    } finally {
+      setSavingPipeline(false)
+    }
+  }
+
   if (!user?.is_superuser) {
     return null
   }
@@ -198,7 +239,8 @@ export function AdminPage() {
         </div>
       </div>
 
-      <Card padding="lg">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <Card padding="lg" className="lg:col-span-2">
         <h2 className="text-lg font-semibold text-text-primary flex items-center gap-2">
           <Sparkles className="w-5 h-5" />
           AI Models
@@ -260,6 +302,62 @@ export function AdminPage() {
           <p className="text-sm text-red-500 mt-3">{saveModelError}</p>
         )}
       </Card>
+
+      <Card padding="lg">
+        <h2 className="text-lg font-semibold text-text-primary flex items-center gap-2">
+          <Workflow className="w-5 h-5" />
+          AI Pipeline
+        </h2>
+        <p className="text-sm text-text-secondary mt-1">
+          Toggle which AI steps run on new analyses.
+        </p>
+
+        <div className="mt-4 space-y-3">
+          {PIPELINE_STEPS_UI.map((step) => {
+            const enabled = pipeline[step.key] !== false
+            return (
+              <div key={step.key} className="flex items-center justify-between gap-3">
+                <span className="text-sm text-text-primary">{step.label}</span>
+                <button
+                  type="button"
+                  onClick={() => togglePipelineStep(step.key)}
+                  aria-pressed={enabled}
+                  className={`w-10 h-5 rounded-full relative transition-colors ${
+                    enabled ? 'bg-primary' : 'bg-gray-300'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${
+                      enabled ? 'left-5' : 'left-0.5'
+                    }`}
+                  />
+                </button>
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="mt-4">
+          <Button onClick={handleSavePipeline} disabled={savingPipeline}>
+            {savingPipeline ? (
+              'Saving...'
+            ) : (
+              <>
+                <Save className="w-4 h-4" />
+                Save Pipeline
+              </>
+            )}
+          </Button>
+        </div>
+
+        {savePipelineSuccess && (
+          <p className="text-sm text-green-500 mt-3">{savePipelineSuccess}</p>
+        )}
+        {savePipelineError && (
+          <p className="text-sm text-red-500 mt-3">{savePipelineError}</p>
+        )}
+      </Card>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-4">

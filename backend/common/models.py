@@ -21,6 +21,7 @@ class PlatformSetting(models.Model):
         ],
         default='fast',
     )
+    disabled_pipeline_steps = models.JSONField(default=list, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
