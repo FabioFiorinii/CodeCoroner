@@ -296,10 +296,12 @@ podman-compose up -d django
 
 ### `relation "..." does not exist` / Migrazioni fallite
 
-Le migrazioni vengono generate automaticamente all'avvio (`makemigrations` + `migrate`). Se il database è stato resettato, basta riavviare django:
+Le migrazioni NON vengono più eseguite automaticamente all'avvio. Dopo un reset del database o un pull con nuove migrazioni, applicale esplicitamente:
 
 ```bash
-podman-compose restart django
+make migrate
+# e se serve ricreare i dati base:
+make seed
 ```
 
 ### Container "name already in use"
@@ -423,7 +425,7 @@ The codebase runs the full stack locally on Podman, but several **production gap
 
 - **TLS**: nginx serves plaintext on :8080; no certificates, HSTS or CSP at the proxy.
 - **Secrets**: `base.py` falls back to a hardcoded dev secret and DB password; webhook secrets are stored in plaintext in the DB.
-- **Migrations**: `makemigrations` + `migrate` + `seed_base` run at every container start — needs an explicit, locked migration step.
+- **Migrations**: applied explicitly via `make migrate` (no `makemigrations`/`migrate`/`seed_base` at container start anymore); the container starts `runserver` directly.
 - **CI/CD**: no pipeline; build reproducibility is only manual (`make build`). Note that `podman-compose up -d` can silently reuse **stale images** — rebuild with `make build` after Dockerfile/requirements changes.
 - **Backup & DR**: no pg_dump/minio/media backup scripts, no restore runbook.
 - **Observability**: console logging only; no Sentry, Prometheus or Celery failure alerting.

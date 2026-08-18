@@ -9,7 +9,7 @@ CodeCoroner: AI debugging/RCA platform. Monorepo with 4 codebases:
 ## Dev environment
 
 - The stack only runs via **Podman Compose, which requires WSL2 on Windows**. Native Windows won't work. All backend/frontend processes run in containers.
-- Dockerfiles use bind mounts (`./backend:/app`, `./ai-engine:/app`, `./frontend:/app`), so Python/TS edits hot-reload. The **django container runs `makemigrations` + `migrate` on every startup** (podman-compose.yml) and migrations are committed.
+- Dockerfiles use bind mounts (`./backend:/app`, `./ai-engine:/app`, `./frontend:/app`), so Python/TS edits hot-reload. The django container starts `runserver` directly; migrations are applied explicitly with `make migrate` and are committed.
 - `make` targets are the canonical commands (`make up/down/build/logs/migrate/test/lint/shell/seed/superuser/ps`). `make clean` prunes ALL cached images including the ~3GB Ollama image — avoid unless intended.
 
 ## Commands
