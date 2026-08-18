@@ -156,7 +156,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: codecoroner-celery
-    command: celery -A config.celery worker -l INFO --concurrency=2
+    command: celery -A config.celery worker -l INFO --concurrency=2 -Q celery,llm
     volumes:
       - ./backend:/app:Z
       - repo_cache:/app/media/repos:Z
