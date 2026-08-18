@@ -265,6 +265,8 @@ make migrate  # Esegue le migrazioni DB
 make test     # Esegue i test backend (pytest in container)
 make lint     # Ruff check + mypy in container
 make shell    # Apre Django shell
+# Test frontend (il Node host è v16, troppo vecchio per vitest 2 → container node:22):
+# podman run --rm -v ./frontend:/app -v cc_frontend_modules:/app/node_modules -w /app node:22-alpine sh -c "npm ci --no-audit --no-fund && npm run test"
 make seed     # Popola il DB con dati base (admin@codecoroner.dev / adminadmin) — eseguito anche automaticamente al primo avvio
 make seed-demo # Popola il DB con dati demo/test (bob, alice, progetto Flask Demo)
 make superuser # Crea superuser
@@ -414,11 +416,11 @@ WebSocket: `ws://localhost:8080/ws/analyses/{id}/` (real-time status; stage comp
 - **Backup & DR** — `make backup` (pg_dump + repo volume) / `make restore` with runbook
 - **Logging** — structured JSON logs with daily rotation in prod (`LOGGING`, TimedRotatingFileHandler)
 - **Data lifecycle** — periodic purge via Celery beat (git GC, orphan repo dirs, analysis retention 90d) + pgvector **HNSW** index on embeddings
+- **Frontend tests** — Vitest wired up (28 tests: api client, auth store, status maps, utils, Button, Input)
 - **Backend test suite** — 101 passing (projects CRUD, repos, analyses, webhooks, lockout, tenant isolation, cleanup, JSON logging)
 
 ### 🔜 Next
-- **Sandbox validation** — Wire the validation container into the pipeline (currently a stub)
-- **Frontend tests** — Vitest is installed but not configured (`npm run test` missing)
+- **Sandbox validation** — Wire the validation container into the pipeline (currently a stub; deferred)
 - **TLS/HTTPS** — Certificate termination on nginx + HSTS/CSP headers
 
 ### Deliberately out of scope

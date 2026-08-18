@@ -23,7 +23,7 @@ make seed                      # base install (admin@codecoroner.dev / adminadmi
 make seed-demo                 # demo/test data (bob, alice, Flask Demo project/repo/analysis)
 ```
 
-- Frontend: `npm run lint` (eslint), `npm run typecheck` (`tsc --noEmit`), `npm run build` (`tsc -b && vite build`). Vite dev server runs on 5173 proxying `/api` and `/ws` to `:8000`. **Vitest is installed but no test script is configured** — frontend tests effectively don't run.
+- Frontend: `npm run lint` (eslint), `npm run typecheck` (`tsc --noEmit`), `npm run build` (`tsc -b && vite build`), `npm run test` (vitest, 28 tests in `src/**/*.test.{ts,tsx}`). Vite dev server runs on 5173 proxying `/api` and `/ws` to `:8000`. **Host Node is v16 — too old for vitest 2; run frontend tests with the helper container: `podman run --rm -v ./frontend:/app -v cc_frontend_modules:/app/node_modules -w /app node:22-alpine sh -c "npm ci --no-audit --no-fund && npm run test"`** (host `node_modules` is Windows-native, incompatible with the Linux container).
 - ai-engine runs `uvicorn agents.agent_server:app` on 8002; no pytest config of its own, but `ai-engine/tests/` exists.
 
 ## Architecture notes
