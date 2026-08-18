@@ -424,7 +424,7 @@ WebSocket: `ws://localhost:8080/ws/analyses/{id}/` (real-time status; stage comp
 The codebase runs the full stack locally on Podman, but several **production gaps remain** before a public deployment. High-priority items:
 
 - **TLS**: nginx serves plaintext on :8080; no certificates, HSTS or CSP at the proxy.
-- **Secrets**: `base.py` falls back to a hardcoded dev secret and DB password; webhook secrets are stored in plaintext in the DB.
+- **Secrets**: with `config.settings.prod` the app **fails fast** if `DJANGO_SECRET_KEY`/`DB_PASSWORD` are missing or still set to the dev defaults; `.env` is gitignored. Still open: webhook secrets are stored in plaintext in the DB.
 - **Migrations**: applied explicitly via `make migrate` (no `makemigrations`/`migrate`/`seed_base` at container start anymore); the container starts `runserver` directly.
 - **CI/CD**: no pipeline; build reproducibility is only manual (`make build`). Note that `podman-compose up -d` can silently reuse **stale images** — rebuild with `make build` after Dockerfile/requirements changes.
 - **Backup & DR**: no pg_dump/minio/media backup scripts, no restore runbook.

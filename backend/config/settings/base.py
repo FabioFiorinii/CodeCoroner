@@ -1,13 +1,27 @@
 import json
 import os
-from pathlib import Path
 from datetime import timedelta
+from pathlib import Path
+
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'dev-secret-key-change-in-production')
-
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() in ('true', '1', 'yes')
+
+IS_PRODUCTION = os.environ.get('DJANGO_SETTINGS_MODULE', '').endswith('.prod')
+
+
+def _require_secret(name: str, default: str) -> str:
+    value = os.environ.get(name, '')
+    if value and value != default:
+        return value
+    if IS_PRODUCTION:
+        raise ImproperlyConfigured(f'{name} must be set to a non-default value in production')
+    return default
+
+
+SECRET_KEY = _require_secret('DJANGO_SECRET_KEY', 'dev-secret-key-change-in-production')
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
@@ -74,7 +88,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.environ.get('DB_NAME', 'codecoroner'),
         'USER': os.environ.get('DB_USER', 'codecoroner'),
-        'PASSWORD': os.environ.get('DB_PASSWORD', 'dev_password'),
+        'PASSWORD': _require_secret('DB_PASSWORD', 'dev_password'),
         'HOST': os.environ.get('DB_HOST', 'localhost'),
         'PORT': os.environ.get('DB_PORT', '5432'),
         'OPTIONS': {'pool': True},
