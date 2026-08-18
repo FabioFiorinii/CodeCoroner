@@ -1,8 +1,11 @@
-from rest_framework import serializers
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import Group
+from django.core.exceptions import PermissionDenied
+from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
+
 from .models import User
+
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
@@ -26,8 +29,17 @@ class LoginSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True)
 
     def validate(self, data):
-        user = authenticate(email=data['email'], password=data['password'])
+        request = self.context.get('request')
+        user = authenticate(
+            request=request,
+            email=data['email'],
+            password=data['password'],
+        )
         if not user or not user.is_active:
+            if getattr(request, 'axes_locked_out', None):
+                raise PermissionDenied(
+                    'Account temporarily locked after too many failed attempts.'
+                )
             raise serializers.ValidationError('Invalid email or password.')
         refresh = RefreshToken.for_user(user)
         return {

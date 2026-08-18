@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'channels',
     'django_celery_beat',
     'django_celery_results',
+    'axes',
     'accounts',
     'projects',
     'repositories',
@@ -60,6 +61,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'axes.middleware.AxesMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -113,6 +115,19 @@ CHANNEL_LAYERS = {
 }
 
 AUTH_USER_MODEL = 'accounts.User'
+
+AUTHENTICATION_BACKENDS = [
+    'axes.backends.AxesBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
+AXES_FAILURE_LIMIT = 5
+AXES_COOLOFF_TIME = 1
+AXES_USERNAME_FORM_FIELD = 'email'
+AXES_LOCKOUT_PARAMETERS = ['username']
+AXES_LOCKOUT_TEMPLATE = None
+AXES_RESET_ON_SUCCESS = True
+AXES_RESET_COOL_OFF_ON_FAILURE_DURING_LOCKOUT = False
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
@@ -180,6 +195,7 @@ if os.environ.get('LDAP_SERVER_URI'):
     from django_auth_ldap.config import GroupOfNamesType, LDAPSearch
 
     AUTHENTICATION_BACKENDS = [
+        'axes.backends.AxesStandaloneBackend',
         'django_auth_ldap.backend.LDAPBackend',
         'django.contrib.auth.backends.ModelBackend',
     ]
