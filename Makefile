@@ -1,10 +1,16 @@
-.PHONY: up down build logs migrate test lint shell seed seed-demo superuser clean restart ps
+.PHONY: up down build logs migrate test lint shell seed seed-demo superuser clean restart ps backup restore
 
 up:
 	podman-compose up -d
 
 down:
 	podman-compose down
+
+backup:
+	bash scripts/backup.sh
+
+restore:
+	bash scripts/restore.sh $(DUMP)
 
 build:
 	podman-compose build

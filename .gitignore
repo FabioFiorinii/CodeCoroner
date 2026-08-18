@@ -39,6 +39,9 @@ htmlcov/
 # Logs
 *.log
 
+# Backups (contain DB dumps with sensitive data)
+backups/
+
 # Secrets
 .secrets.baseline
 
