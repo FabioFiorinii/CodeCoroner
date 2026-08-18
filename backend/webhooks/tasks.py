@@ -6,6 +6,7 @@ import logging
 import httpx
 from celery import shared_task
 
+from .crypto import decrypt_secret
 from .models import Webhook
 
 logger = logging.getLogger(__name__)
@@ -20,8 +21,9 @@ def send_webhook(webhook: Webhook, event: str, payload: dict) -> None:
         'X-CodeCoroner-Event': event,
         'X-CodeCoroner-Delivery': str(webhook.id),
     }
-    if webhook.secret:
-        signature = hmac.new(webhook.secret.encode('utf-8'), body, hashlib.sha256).hexdigest()
+    secret = decrypt_secret(webhook.secret)
+    if secret:
+        signature = hmac.new(secret.encode('utf-8'), body, hashlib.sha256).hexdigest()
         headers['X-CodeCoroner-Signature'] = f'sha256={signature}'
 
     resp = httpx.post(webhook.url, content=body, headers=headers, timeout=WEBHOOK_TIMEOUT)

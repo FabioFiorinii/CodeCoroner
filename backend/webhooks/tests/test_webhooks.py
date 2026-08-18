@@ -9,6 +9,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from projects.models import Project
+from webhooks.crypto import decrypt_secret
 from webhooks.models import Webhook
 from webhooks.tasks import send_webhook
 
@@ -48,6 +49,20 @@ class WebhookServiceTests(TestCase):
         )
         self.assertEqual(call_kwargs['headers']['X-CodeCoroner-Event'], 'analysis.completed')
         self.assertEqual(mock_post.call_args.args[0], self.webhook.url)
+
+    @patch('webhooks.tasks.httpx.post')
+    def test_secret_encrypted_at_rest_and_decrypts(self, mock_post):
+        mock_post.return_value = Mock(status_code=200, text='ok')
+        stored = Webhook.objects.get(id=self.webhook.id)
+        self.assertTrue(stored.secret.startswith('enc:'))
+        self.assertNotIn('s3cr3t', stored.secret)
+
+        send_webhook(stored, 'analysis.created', {})
+        call_kwargs = mock_post.call_args.kwargs
+        self.assertIn('X-CodeCoroner-Signature', call_kwargs['headers'])
+
+        refreshed = Webhook.objects.get(id=self.webhook.id)
+        self.assertEqual(decrypt_secret(refreshed.secret), 's3cr3t')
 
     @patch('webhooks.tasks.httpx.post')
     def test_send_webhook_raises_on_error_status(self, mock_post):
@@ -132,7 +147,8 @@ class WebhookApiTests(TestCase):
         self.assertNotIn('secret', resp.data)
 
         webhook = Webhook.objects.get(id=resp.data['id'])
-        self.assertEqual(webhook.secret, 's3cr3t')
+        self.assertNotEqual(webhook.secret, 's3cr3t')
+        self.assertEqual(decrypt_secret(webhook.secret), 's3cr3t')
         self.assertEqual(webhook.events, ['analysis.created'])
 
         list_resp = self.client.get(f'{self.list_url}?project={self.project.id}')

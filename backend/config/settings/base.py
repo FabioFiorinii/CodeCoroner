@@ -185,6 +185,8 @@ SIMPLE_JWT = {
 
 AI_ENGINE_URL = os.environ.get('AI_ENGINE_URL', 'http://ai-engine:8002')
 
+WEBHOOK_SECRET_KEY = os.environ.get('WEBHOOK_SECRET_KEY', '')
+
 AUTO_PULL_HOUR = int(os.environ.get('AUTO_PULL_HOUR', '3'))
 AUTO_PULL_MINUTE = int(os.environ.get('AUTO_PULL_MINUTE', '0'))
 

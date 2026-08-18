@@ -7,6 +7,7 @@ django-redis>=5.4
 django-celery-beat>=2.6
 django-celery-results>=2.5
 django-axes>=6.4
+cryptography>=42.0
 psycopg2-binary>=2.9
 pgvector>=0.3
 celery>=5.4
