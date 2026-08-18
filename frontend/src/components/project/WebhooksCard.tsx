@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link2, Plus, Send, Trash2, Power, X } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import { api } from '../../lib/api'
@@ -33,18 +33,18 @@ export function WebhooksCard({ projectId }: { projectId: string }) {
   const [active, setActive] = useState(true)
   const [busy, setBusy] = useState(false)
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const data = await api.get<{ results: WebhookItem[] }>(`/webhooks/?project=${projectId}`)
       setWebhooks(data.results)
     } catch (err) {
       console.error('Failed to load webhooks', err)
     }
-  }
+  }, [projectId])
 
   useEffect(() => {
     if (user?.is_superuser) load()
-  }, [projectId, user])
+  }, [load, user])
 
   if (!user?.is_superuser) return null
 
@@ -69,7 +69,7 @@ export function WebhooksCard({ projectId }: { projectId: string }) {
       setShowForm(false)
       toast('Webhook created', { type: 'success' })
       await load()
-    } catch (err) {
+    } catch {
       toast('Failed to create webhook', { type: 'error' })
     } finally {
       setBusy(false)
@@ -80,7 +80,7 @@ export function WebhooksCard({ projectId }: { projectId: string }) {
     try {
       await api.patch(`/webhooks/${webhook.id}/`, { is_active: !webhook.is_active })
       await load()
-    } catch (err) {
+    } catch {
       toast('Failed to update webhook', { type: 'error' })
     }
   }
@@ -97,7 +97,7 @@ export function WebhooksCard({ projectId }: { projectId: string }) {
       await api.delete(`/webhooks/${webhook.id}/`)
       toast('Webhook deleted', { type: 'success' })
       await load()
-    } catch (err) {
+    } catch {
       toast('Failed to delete webhook', { type: 'error' })
     }
   }
@@ -106,7 +106,7 @@ export function WebhooksCard({ projectId }: { projectId: string }) {
     try {
       const res = await api.post<{ detail: string }>(`/webhooks/${webhook.id}/test/`)
       toast(res.detail, { type: 'success' })
-    } catch (err) {
+    } catch {
       toast('Webhook test failed', { type: 'error' })
     }
   }
