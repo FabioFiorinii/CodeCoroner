@@ -407,31 +407,39 @@ WebSocket: `ws://localhost:8080/ws/analyses/{id}/` (real-time status; stage comp
 - **Real-time** — WebSocket + Channels + Daphne, stage-level notifications in the UI
 - **Deterministic AI** — temperature 0, strict JSON + tolerant parsing, model tiers in Admin
 - **Admin controls** — AI model tier selector + per-stage pipeline toggles
-- **Webhooks** — CRUD + test events, dispatched on analysis lifecycle
-- **Access control** — project memberships, groups, repo visibility for groups/superusers
+- **Webhooks** — CRUD + test events, dispatched on analysis lifecycle; secrets stored **encrypted (Fernet)** and never serialized back
+- **Access control** — project memberships, groups, repo visibility for groups/superusers; **tenant isolation tests** (cross-tenant 404/403, owner-only membership mutations, foreign-repo assignment blocked)
 - **Auth options** — JWT (rotating refresh tokens, blacklist) + optional LDAP group mapping
-- **Backend test suite** — 75 passing (projects CRUD, repos, analyses, webhooks)
+- **Login hardening** — brute-force lockout via django-axes (5 failed attempts → 24h cooldown, 403 on locked account)
+- **Backup & DR** — `make backup` (pg_dump + repo volume) / `make restore` with runbook
+- **Logging** — structured JSON logs with daily rotation in prod (`LOGGING`, TimedRotatingFileHandler)
+- **Data lifecycle** — periodic purge via Celery beat (git GC, orphan repo dirs, analysis retention 90d) + pgvector **HNSW** index on embeddings
+- **Backend test suite** — 101 passing (projects CRUD, repos, analyses, webhooks, lockout, tenant isolation, cleanup, JSON logging)
 
 ### 🔜 Next
-- **CI/CD** — GitHub Actions (pytest + ruff + mypy + tsc/build in clean containers)
 - **Sandbox validation** — Wire the validation container into the pipeline (currently a stub)
 - **Frontend tests** — Vitest is installed but not configured (`npm run test` missing)
 - **TLS/HTTPS** — Certificate termination on nginx + HSTS/CSP headers
-- **Deploy & DR runbook** — Backup/restore, staging env
+
+### Deliberately out of scope
+- **CI/CD** — no GitHub Actions (no paid GitHub); reproducibility is manual via `make build`
+- **Dependency scanning** — no Dependabot/renovate
 
 ## Production Readiness
 
 The codebase runs the full stack locally on Podman, but several **production gaps remain** before a public deployment. High-priority items:
 
 - **TLS**: nginx still serves plaintext on :8080; **security headers are in place** (X-Frame-Options, nosniff, Referrer-Policy, CSP) on both nginx layers, but HSTS/certificate termination remain.
-- **Secrets**: with `config.settings.prod` the app **fails fast** if `DJANGO_SECRET_KEY`/`DB_PASSWORD` are missing or still set to the dev defaults; `.env` is gitignored. Still open: webhook secrets are stored in plaintext in the DB.
+- **Secrets**: with `config.settings.prod` the app **fails fast** if `DJANGO_SECRET_KEY`/`DB_PASSWORD` are missing or still set to the dev defaults; `.env` is gitignored; **webhook secrets are encrypted at rest** (Fernet, key from `WEBHOOK_SECRET_KEY` env, falling back to `DJANGO_SECRET_KEY`).
 - **Migrations**: applied explicitly via `make migrate` (no `makemigrations`/`migrate`/`seed_base` at container start anymore); the container starts `runserver` directly.
-- **CI/CD**: no pipeline; build reproducibility is only manual (`make build`). Note that `podman-compose up -d` can silently reuse **stale images** — rebuild with `make build` after Dockerfile/requirements changes.
-- **Backup & DR**: no pg_dump/minio/media backup scripts, no restore runbook.
-- **Observability**: console logging only; no Sentry, Prometheus or Celery failure alerting.
-- **Queue hardening**: `acks_late` + `reject_on_worker_lost` (tasks are redelivered if a worker dies mid-run) and a dedicated `llm` queue so long analyses don't block short tasks. Still open: no dead-letter queue, Celery beat runs with no scheduled tasks.
-- **Data lifecycle**: no git GC, no cleanup for orphaned repos/embeddings, no pgvector index on embeddings (fine at current scale).
+- **Build reproducibility**: no CI — rebuild with `make build` after Dockerfile/requirements changes. Note that `podman-compose up -d` can silently reuse **stale images** (`backend/.dockerignore` was previously excluding `requirements-dev.txt`, breaking `make build`; fixed). The Dockerfile collects static with dev settings (prod settings fail fast on secrets, which would break the build step).
+- **Backup & DR**: `make backup` dumps Postgres (`pg_dump -Fc`) and the repo volume into `backups/`, `make restore` recreates them — see `scripts/backup-restore.md`. Not yet tested on a fresh machine / offsite storage.
+- **Observability**: structured **JSON logs** (stdout + daily-rotating file in prod). Still no Sentry, Prometheus or Celery failure alerting.
+- **Queue hardening**: `acks_late` + `reject_on_worker_lost` (tasks are redelivered if a worker dies mid-run) and a dedicated `llm` queue so long analyses don't block short tasks. Still open: no dead-letter queue. Beat schedules the **weekly stale-data purge** (git GC, orphan repo dirs, analysis retention) plus daily auto-pull.
+- **Data lifecycle**: periodic purge removes old analyses and orphaned repo dirs; `git gc` keeps clones small; embeddings have a pgvector **HNSW** index. Backups do not yet prune old dumps automatically beyond retention.
+- **Login hardening**: django-axes enforces a per-account lockout (5 attempts → 1h cooldown, configurable). Cooldown intentionally does not count IPs (shared office/NAT would trigger false positives).
 - **Input limits**: ai-engine rejects payloads over 200k chars on the analysis endpoints (400) — bounds prompt-injection surface and runaway costs.
+- **Multi-tenant**: analyses/projects/repos/webhooks are scoped per project membership + groups; cross-tenant reads/mutations return 404/403, membership management and repo assignment are owner-only, and webhook endpoints are superuser-only. Covered by `common/tests/test_tenant_isolation.py`.
 
 See `specs/*.md` for design intent — some files have drifted from the current code (trust the code).
 
