@@ -1,9 +1,9 @@
 # CodeCoroner — AI-Assisted Debugging & Root Cause Analysis Platform
 
-[![CI](https://github.com/your-org/codecoroner/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/codecoroner/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.13-blue)
-![Django](https://img.shields.io/badge/django-5.1-green)
+![Django](https://img.shields.io/badge/django-5.2-green)
 ![React](https://img.shields.io/badge/react-18-61DAFB)
+![Tests](https://img.shields.io/badge/tests-75%20passed-green)
 ![License](https://img.shields.io/badge/license-AGPLv3-blue)
 
 ## What is CodeCoroner?
@@ -18,7 +18,20 @@ CodeCoroner is an AI-native debugging platform that automates root cause analysi
 6. **Generates** a comprehensive report
 7. **Suggests** a fix with unified diff, AI-ready implementation plan, and detailed explanation
 
-Unlike a simple RAG chatbot, CodeCoroner runs a **multi-agent pipeline** with specialized AI agents (Repository Indexer, Log Analyzer, Bug Localizer, Root Cause Agent, Patch Generator, Report Generator).
+Unlike a simple RAG chatbot, CodeCoroner runs a **multi-agent pipeline** with specialized AI agents (Repository Indexer, Log Analyzer, Bug Localizer, Root Cause Agent, Patch Generator, Report Generator). Progress is streamed to the UI in **real time over WebSocket**, generation is **deterministic** (temperature 0 + robust JSON recovery), and each AI stage can be **toggled on/off from the Admin panel** (e.g. disable Fix Suggestion when only localization is needed).
+
+### AI Pipeline (per analysis run)
+
+| Step | Key | Purpose |
+|---|---|---|
+| 1. Repository indexing | `ensure_repo_indexed` | Clone/pull, tree-sitter chunking, batch embeddings into pgvector |
+| 2. Log Analysis | `analyze_input` | Parse stacktraces/logs from the error context |
+| 3. Bug Localization | `bug_localization` | Hybrid retrieval + LLM ranking of suspicious files |
+| 4. Root Cause Analysis | `root_cause` | LLM reasoning with cause chain and confidence score |
+| 5. Fix Suggestion | `fix_suggestion` | Unified diff + implementation plan (never touches test files) |
+| 6. Report Generation | `generate_report` | Multi-section markdown report |
+
+Every stage can be **disabled from Admin → AI Pipeline**; disabled stages are skipped and reported as `skipped` in the UI, and later stages degrade gracefully (the report states which steps were not run instead of inventing content).
 
 ## Architecture Overview
 
@@ -50,7 +63,7 @@ Unlike a simple RAG chatbot, CodeCoroner runs a **multi-agent pipeline** with sp
 └────────┘ └────────┘ └──────────┘
 ```
 
-### Containers (10 services)
+### Containers (11 services)
 
 | Service | Image | Purpose |
 |---|---|---|
@@ -60,8 +73,8 @@ Unlike a simple RAG chatbot, CodeCoroner runs a **multi-agent pipeline** with sp
 | `ollama` | ollama/ollama | Local LLM (Qwen2.5-Coder, Nomic-Embed) |
 | `django` | custom | REST API, admin, ORM |
 | `daphne` | custom | ASGI WebSocket server |
-| `celery_worker` | custom | Async task execution |
-| `celery_beat` | custom | Scheduled tasks |
+| `celery` | custom | Async task execution |
+| `beat` | custom | Celery beat scheduler |
 | `frontend` | custom | React SPA (Nginx) |
 | `ai-engine` | custom | Agent server (Ollama client) |
 | `nginx` | nginx:alpine | Reverse proxy, static files |
@@ -69,7 +82,7 @@ Unlike a simple RAG chatbot, CodeCoroner runs a **multi-agent pipeline** with sp
 ## Tech Stack
 
 ### Backend
-- **Python 3.13** + **Django 5.1** + **DRF 3.15**
+- **Python 3.13** + **Django 5.2** + **DRF 3.18**
 - **Celery 5.4** + **Redis** (task queue)
 - **Channels** (WebSocket for real-time status)
 - **PostgreSQL 16** + **pgvector** (vector search)
@@ -87,8 +100,9 @@ Unlike a simple RAG chatbot, CodeCoroner runs a **multi-agent pipeline** with sp
 ### AI
 - **Ollama** (local LLM execution)
 - **nomic-embed-text** (768-dim code embeddings)
-- **qwen2.5-coder:1.5b** (default — analysis pipeline; auto-downloaded on startup)
-- **qwen2.5-coder:3b / 7b** (balanced / precise tiers, selectable in Admin Settings)
+- **qwen2.5-coder:3b** (default tier — analysis pipeline; auto-downloaded on startup)
+- **qwen2.5-coder:3b / 7b / 14b** (fast / balanced / precise tiers, selectable in Admin Settings)
+- **Deterministic generation**: `temperature=0` everywhere, strict JSON prompts, tolerant JSON parsing (unterminated strings recovered)
 
 ### Infrastructure
 - **Podman** (daemonless container runtime)
@@ -245,14 +259,17 @@ podman-compose exec ollama ollama pull nomic-embed-text
 ```bash
 make up       # Avvia tutti i servizi
 make down     # Ferma tutti i servizi
+make build    # Ricostruisce le immagini (fatelo dopo modifiche ai Dockerfile/requirements!)
 make logs     # Vedi i log in tempo reale
-make build    # Ricostruisce le immagini
 make migrate  # Esegue le migrazioni DB
-make test     # Esegue i test
+make test     # Esegue i test backend (pytest in container)
+make lint     # Ruff check + mypy in container
 make shell    # Apre Django shell
 make seed     # Popola il DB con dati base (admin@codecoroner.dev / adminadmin) — eseguito anche automaticamente al primo avvio
 make seed-demo # Popola il DB con dati demo/test (bob, alice, progetto Flask Demo)
 make superuser # Crea superuser
+make ps       # Stato dei container
+make restart  # down + up
 make clean    # Ferma tutto e pulisce i volumi (cancella TUTTE le immagini in cache!)
 ```
 
@@ -355,35 +372,66 @@ GET    /api/v1/analyses/{id}/status/             # Poll status
 GET    /api/v1/analyses/{id}/localization/       # Bug localization results
 GET    /api/v1/analyses/{id}/root-cause/         # Root cause analysis
 GET    /api/v1/analyses/{id}/fix-suggestion/     # Fix suggestion (diff + plan + explanation)
-GET    /api/v1/analyses/{id}/patch/              # Generated patch (legacy)
 GET    /api/v1/analyses/{id}/report/             # Final report
 ```
 
-WebSocket: `ws://localhost:8080/ws/analyses/{id}/` (real-time status)
+### Webhooks
+```
+GET/POST /api/v1/webhooks/                       # List / create webhook
+GET/PUT/DELETE /api/v1/webhooks/{id}/            # Webhook detail / update / delete
+POST   /api/v1/webhooks/{id}/test/               # Fire a test event
+```
+
+### Dashboard & Admin
+```
+GET  /api/v1/dashboard/summary/                  # Metrics (analyses, repos, active runs)
+GET  /api/v1/dashboard/activity/                 # Recent activity feed
+GET/PATCH /api/v1/auth/admin/model-settings/     # AI model tier + AI pipeline step toggles
+```
+
+WebSocket: `ws://localhost:8080/ws/analyses/{id}/` (real-time status; stage completed/failed/skipped events)
 
 ## Development Status
 
 ### ✅ Completed
 - **Foundation** — Django, DRF, Celery, PostgreSQL, auth, Podman Compose
-- **Repository Indexing** — Tree-sitter, chunking (Python, JavaScript, Go, Rust, Java, C/C++)
+- **Repository Indexing** — Tree-sitter, chunking (Python, JavaScript, Go, Rust, Java, C/C++), auto-pull
 - **Embeddings** — Ollama, pgvector, batch processing
 - **Bug Localization** — Log analyzer, hybrid search (vector + FTS), suspicion scoring
 - **Root Cause Analysis** — LLM-driven RCA with confidence scoring
-- **Report Generation** — Multi-section markdown report
-- **Fix Suggestion** — Unified diff + AI-ready fix plan + explanation (V1)
-- **Frontend** — Full SPA: projects, repos, analyses list/detail/create, real-time polling
-- **WebSocket** — Channels + Daphne + real-time status broadcasting
+- **Fix Suggestion** — Unified diff + AI-ready fix plan + explanation; never touches test files
+- **Report Generation** — Multi-section markdown report, robust to disabled/missing stages
+- **Frontend** — Full SPA: projects, repos, analyses list/detail/create, dashboard, admin settings
+- **Real-time** — WebSocket + Channels + Daphne, stage-level notifications in the UI
+- **Deterministic AI** — temperature 0, strict JSON + tolerant parsing, model tiers in Admin
+- **Admin controls** — AI model tier selector + per-stage pipeline toggles
+- **Webhooks** — CRUD + test events, dispatched on analysis lifecycle
+- **Access control** — project memberships, groups, repo visibility for groups/superusers
+- **Auth options** — JWT (rotating refresh tokens, blacklist) + optional LDAP group mapping
+- **Backend test suite** — 75 passing (projects CRUD, repos, analyses, webhooks)
 
 ### 🔜 Next
-- **Test Suite** — Backend + frontend + E2E
-- **CI/CD** — GitHub Actions
-- **Sandbox** — Isolated validation container for patch testing
-- **Seed Script** — Demo data for quick-start
-- **Documentation** — API docs, architecture deep-dive
+- **CI/CD** — GitHub Actions (pytest + ruff + mypy + tsc/build in clean containers)
+- **Sandbox validation** — Wire the validation container into the pipeline (currently a stub)
+- **Frontend tests** — Vitest is installed but not configured (`npm run test` missing)
+- **TLS/HTTPS** — Certificate termination on nginx + HSTS/CSP headers
+- **Deploy & DR runbook** — Backup/restore, staging env
 
-### Future
-- **V2** — Teams, webhooks, CI/CD integration
-- **V3** — SaaS: multi-tenant, SSO, billing, cloud AI providers
+## Production Readiness
+
+The codebase runs the full stack locally on Podman, but several **production gaps remain** before a public deployment. High-priority items:
+
+- **TLS**: nginx serves plaintext on :8080; no certificates, HSTS or CSP at the proxy.
+- **Secrets**: `base.py` falls back to a hardcoded dev secret and DB password; webhook secrets are stored in plaintext in the DB.
+- **Migrations**: `makemigrations` + `migrate` + `seed_base` run at every container start — needs an explicit, locked migration step.
+- **CI/CD**: no pipeline; build reproducibility is only manual (`make build`). Note that `podman-compose up -d` can silently reuse **stale images** — rebuild with `make build` after Dockerfile/requirements changes.
+- **Backup & DR**: no pg_dump/minio/media backup scripts, no restore runbook.
+- **Observability**: console logging only; no Sentry, Prometheus or Celery failure alerting.
+- **Queue hardening**: no `acks_late`/dead-letter queue; Celery beat runs with no scheduled tasks.
+- **Data lifecycle**: no git GC, no cleanup for orphaned repos/embeddings, no pgvector index on embeddings (fine at current scale).
+- **Input limits**: ai-engine has no size limits on logs/stacktraces (prompt-injection surface).
+
+See `specs/*.md` for design intent — some files have drifted from the current code (trust the code).
 
 ## License
 
