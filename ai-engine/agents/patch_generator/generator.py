@@ -5,7 +5,26 @@ from agents.json_utils import parse_json_response
 
 logger = logging.getLogger(__name__)
 
+TEST_SEGMENTS = {'test', 'tests', 'spec', 'specs'}
+
+
+def _is_test_path(path: str) -> bool:
+    parts = path.replace('\\', '/').lower().split('/')
+    base = parts[-1]
+    return (
+        any(seg in TEST_SEGMENTS for seg in parts)
+        or base.startswith('test_')
+        or base.endswith('_test.py')
+        or base.endswith('_spec.py')
+    )
+
+
 SUGGEST_FIX_PROMPT = """You are an expert software engineer. Given an error context, log analysis, bug localization, root cause analysis, and relevant source code, generate a fix suggestion.
+
+CRITICAL CONSTRAINT - THE BUG IS IN A SOURCE FILE, NEVER IN A TEST FILE:
+- You MUST NOT modify, create, or delete any test file. Test files are paths containing a segment named test/tests/spec/specs, or files named test_*.py / *_test.py / *_spec.py.
+- Test files have been EXCLUDED from the source code chunks below. If you still see a test file referenced in the localization/root cause data, IGNORE it: never suggest changes to it and never produce a diff for it.
+- Target the actual source file identified by the Root Cause Analysis (root_file). If no source file is available, reason from the error context and stacktrace, but never fall back to editing tests.
 
 Error Context:
 {error_context}
@@ -43,6 +62,11 @@ class PatchGenerator(BaseAgent):
         chunks: list,
         repo_profile: str = '',
     ) -> dict:
+        source_chunks = [
+            c for c in (chunks or []) if not _is_test_path(c.get('file_path', ''))
+        ]
+        if not source_chunks:
+            source_chunks = chunks or []
         source_code = json.dumps([
             {
                 'file_path': c.get('file_path', ''),
@@ -50,7 +74,7 @@ class PatchGenerator(BaseAgent):
                 'start_line': c.get('start_line', 0),
                 'end_line': c.get('end_line', 0),
             }
-            for c in (chunks or [])
+            for c in source_chunks
         ], indent=2)
 
         prompt = SUGGEST_FIX_PROMPT.format(

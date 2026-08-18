@@ -30,6 +30,19 @@ AI_URL = getattr(settings, 'AI_ENGINE_URL', 'http://ai-engine:8002')
 
 STACKTRACE_FILE_RE = re.compile(r'File "([^"]+)"')
 
+TEST_SEGMENTS = {'test', 'tests', 'spec', 'specs'}
+
+
+def _is_test_path(path: str) -> bool:
+    parts = path.replace('\\', '/').lower().split('/')
+    base = parts[-1]
+    return (
+        any(seg in TEST_SEGMENTS for seg in parts)
+        or base.startswith('test_')
+        or base.endswith('_test.py')
+        or base.endswith('_spec.py')
+    )
+
 
 def _safe_float(value, default=0.0):
     if value is None:
@@ -513,6 +526,11 @@ class AnalysisOrchestrator:
                 'reasoning': rc.reasoning,
             }
 
+        chunks = getattr(self, 'top_chunks', [])[:5]
+        source_chunks = [c for c in chunks if not _is_test_path(c.get('file_path', ''))]
+        if not source_chunks:
+            source_chunks = chunks
+
         result = self._call_ai(
             'suggest-fix',
             {
@@ -520,7 +538,7 @@ class AnalysisOrchestrator:
                 'log_analysis': self.log_analysis,
                 'bug_localization': bug_loc,
                 'root_cause': rca,
-                'chunks': getattr(self, 'top_chunks', [])[:5],
+                'chunks': source_chunks,
                 'repo_profile': self.repo_profile,
                 'model': self.model_rca,
             },
