@@ -1,5 +1,7 @@
 import os
+
 from celery import Celery
+from celery.schedules import crontab
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.dev')
 
@@ -22,4 +24,10 @@ CELERY_TASK_REJECT_ON_WORKER_LOST = True
 CELERY_BROKER_TRANSPORT_OPTIONS = {'visibility_timeout': 3600}
 CELERY_TASK_ROUTES = {
     'analyses.tasks.run_analysis_pipeline': {'queue': 'llm'},
+}
+CELERY_BEAT_SCHEDULE = {
+    'purge-stale-data-weekly': {
+        'task': 'common.tasks.purge_stale_data_task',
+        'schedule': crontab(hour=4, minute=0, day_of_week=0),
+    },
 }

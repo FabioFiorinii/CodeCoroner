@@ -190,6 +190,8 @@ WEBHOOK_SECRET_KEY = os.environ.get('WEBHOOK_SECRET_KEY', '')
 AUTO_PULL_HOUR = int(os.environ.get('AUTO_PULL_HOUR', '3'))
 AUTO_PULL_MINUTE = int(os.environ.get('AUTO_PULL_MINUTE', '0'))
 
+ANALYSIS_RETENTION_DAYS = int(os.environ.get('ANALYSIS_RETENTION_DAYS', '90'))
+
 LDAP_GROUP_MAP = json.loads(os.environ.get('LDAP_GROUP_MAP', '{}'))
 
 if os.environ.get('LDAP_SERVER_URI'):
