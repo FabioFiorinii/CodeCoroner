@@ -419,15 +419,19 @@ WebSocket: `wss://localhost:8443/ws/analyses/{id}/` (real-time status; stage com
 - **Logging** — structured JSON logs with daily rotation in prod (`LOGGING`, TimedRotatingFileHandler)
 - **Data lifecycle** — periodic purge via Celery beat (git GC, orphan repo dirs, analysis retention 90d) + pgvector **HNSW** index on embeddings
 - **Frontend tests** — Vitest wired up (28 tests: api client, auth store, status maps, utils, Button, Input)
-- **TLS/HTTPS** — nginx terminates TLS (self-signed cert auto-generated on `nginx_certs` volume), HTTP→HTTPS redirect, HSTS opt-in via `ENABLE_HSTS`, security headers + CSP
-- **Backend test suite** — 101 passing (projects CRUD, repos, analyses, webhooks, lockout, tenant isolation, cleanup, JSON logging)
+- **TLS/HTTPS** — nginx terminates TLS (self-signed cert auto-generated on `nginx_certs` volume), HTTP→HTTPS redirect, HSTS opt-in via `ENABLE_HSTS`, security headers + CSP, proxy-header trust + `CSRF_TRUSTED_ORIGINS` for prod
+- **Dead-letter queue** — failed Celery tasks land in `celery_dlq` (Redis); `manage.py dlq list|count|replay|purge`
+- **Backend test suite** — 108 passing + 14 subtests (projects CRUD, repos, analyses, webhooks, lockout, tenant isolation, cleanup, JSON logging, prod settings)
 
-### 🔜 Next
+### 🚀 Sviluppi futuri
 - **Sandbox validation** — Wire the validation container into the pipeline (currently a stub; deferred)
-
-### Deliberately out of scope
-- **CI/CD** — no GitHub Actions (no paid GitHub); reproducibility is manual via `make build`
-- **Dependency scanning** — no Dependabot/renovate
+- **Observability** — Sentry / Prometheus / alerting on Celery failures (JSON logs suffice for now)
+- **Storage quota** — per-user limits on repos/analyses to bound disk usage
+- **Staging & zero-downtime** — staging env, rolling deploys, versioning (single-host for now)
+- **CI/CD** — GitHub Actions (no paid GitHub); reproducibility is manual via `make build`
+- **Dependency scanning** — Dependabot/renovate for dependency vulnerabilities
+- **GPU acceleration** — Ollama on CUDA/ROCm with a model-tier toggle in admin (see `specs/ai-architecture.md`)
+- **GDPR** — export/cancellation endpoints, access-log retention, DPIA/registry for public multi-tenant (see "Sviluppi futuri")
 
 ## Production Readiness
 
@@ -439,7 +443,7 @@ The codebase runs the full stack locally on Podman, but several **production gap
 - **Build reproducibility**: no CI — rebuild with `make build` after Dockerfile/requirements changes. Note that `podman-compose up -d` can silently reuse **stale images** (`backend/.dockerignore` was previously excluding `requirements-dev.txt`, breaking `make build`; fixed). The Dockerfile collects static with dev settings (prod settings fail fast on secrets, which would break the build step).
 - **Backup & DR**: `make backup` dumps Postgres (`pg_dump -Fc`) and the repo volume into `backups/`, `make restore` recreates them — see `scripts/backup-restore.md`. Not yet tested on a fresh machine / offsite storage.
 - **Observability**: structured **JSON logs** (stdout + daily-rotating file in prod). Still no Sentry, Prometheus or Celery failure alerting.
-- **Queue hardening**: `acks_late` + `reject_on_worker_lost` (tasks are redelivered if a worker dies mid-run) and a dedicated `llm` queue so long analyses don't block short tasks. Still open: no dead-letter queue. Beat schedules the **weekly stale-data purge** (git GC, orphan repo dirs, analysis retention) plus daily auto-pull.
+- **Queue hardening**: `acks_late` + `reject_on_worker_lost` (tasks are redelivered if a worker dies mid-run), a dedicated `llm` queue so long analyses don't block short tasks, and a **dead-letter queue** (`celery_dlq` in Redis, drained via `manage.py dlq`). Beat schedules the **weekly stale-data purge** (git GC, orphan repo dirs, analysis retention) plus daily auto-pull.
 - **Data lifecycle**: periodic purge removes old analyses and orphaned repo dirs; `git gc` keeps clones small; embeddings have a pgvector **HNSW** index. Backups do not yet prune old dumps automatically beyond retention.
 - **Login hardening**: django-axes enforces a per-account lockout (5 attempts → 1h cooldown, configurable). Cooldown intentionally does not count IPs (shared office/NAT would trigger false positives).
 - **Input limits**: ai-engine rejects payloads over 200k chars on the analysis endpoints (400) — bounds prompt-injection surface and runaway costs.

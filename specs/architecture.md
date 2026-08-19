@@ -5,18 +5,20 @@
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                            CLIENT LAYER                                      │
-│  ┌─────────────┐  ┌──────────────┐  ┌───────────────┐  ┌──────────────┐    │
-│  │ React SPA   │  │ REST Client │  │ Git CLI      │  │ CI/CD Hook │    │
-│  │ (Dashboard)  │  │ (curl/httpie)│  │ (git push hook)│  │ (GH Action) │    │
-│  └──────┬──────┘  └──────┬───────┘  └──────┬────────┘  └──────┬───────┘    │
-│         │                │                 │                 │              │
-└─────────┼────────────────┼─────────────────┼─────────────────┼──────────────┘
-          │                │                 │                 │
-          ▼                ▼                 ▼                 ▼
+│  ┌─────────────┐  ┌──────────────┐  ┌───────────────┐                      │
+│  │ React SPA   │  │ REST Client │  │ Git CLI      │                      │
+│  │ (Dashboard)  │  │ (curl/httpie)│  │ (git push hook)│                      │
+│  └──────┬──────┘  └──────┬───────┘  └──────┬────────┘                      │
+│         │                │                 │                               │
+└─────────┼────────────────┼─────────────────┼──────────────────────────────┘
+          │                │                 │
+          ▼                ▼                 ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                          API GATEWAY (Django)                                │
+│                          API GATEWAY (Nginx)                                 │
 │  ┌──────────────────────────────────────────────────────────────────────────┐│
-│  │                        Nginx / Caddy                                    ││
+│  │  TLS termination :8443 (self-signed, auto-generated on first start)      ││
+│  │  HTTP :8080 → 301 redirect to HTTPS                                       ││
+│  │  Security headers + CSP (HSTS opt-in via ENABLE_HSTS=true)               ││
 │  │  ┌──────────┐  ┌──────────────┐  ┌────────────┐  ┌──────────────────┐ ││
 │  │  │ Auth     │  │ DRF Router  │  │ WebSocket  │  │ Static Files    │ ││
 │  │  │ (JWT)   │  │ /api/v1/    │  │ /ws/       │  │ /assets/        │ ││
@@ -36,9 +38,9 @@
 │  │  │  auth)     │ │  config)     │ │  results) │ │  indexing)     │  │   │
 │  │  └────────────┘ └──────────────┘ └──────────┘ └────────────────┘  │   │
 │  │  ┌────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ │   │
-│  │  │ patches    │ │ reports      │ │ webhooks     │ │ celery_tasks  │ │   │
-│  │  │ (patch mgmt│ │ (RCA docs,   │ │ (integrations)│ │ (task status)│ │   │
-│  │  │  validation)│ │  final)      │ │              │ │              │ │   │
+│  │  │ patches    │ │ reports      │ │ webhooks     │ │ common       │ │   │
+│  │  │ (patch mgmt│ │ (RCA docs,   │ │ (integrations)│ │ (logging,    │ │   │
+│  │  │  validation)│ │  final)      │ │              │ │  cleanup)    │ │   │
 │  │  └────────────┘ └──────────────┘ └──────────────┘ └──────────────┘ │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 │                                                                             │
@@ -48,19 +50,21 @@
 │  │  │ GitService   │ │ IndexService │ │ AnalyseSvc │ │ PatchSvc   │   │   │
 │  │  │ (clone/fetch)│ │ (chunk/store)│ │ (orchestra)│ │ (generate)  │   │   │
 │  │  └──────────────┘ └──────────────┘ └────────────┘ └────────────┘   │   │
-│  │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐                 │   │
-│  │  │ ReportSvc    │ │ SandboxSvc   │ │ EvalSvc      │                 │   │
-│  │  │ (generate    │ │ (podman exec)│ │ (test/static) │                 │   │
-│  │  │  doc)        │ │              │ │              │                 │   │
-│  │  └──────────────┘ └──────────────┘ └──────────────┘                 │   │
+│  │  ┌──────────────┐ ┌──────────────┐                                │   │
+│  │  │ ReportSvc    │ │ DLQ/Logging  │                                │   │
+│  │  │ (generate    │ │ (cleanup,    │                                │   │
+│  │  │  doc)        │ │  dead-letter) │                                │   │
+│  │  └──────────────┘ └──────────────┘                                │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 │                                                                             │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
 │  │                       Task Queue (Celery)                            │   │
 │  │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌────────────┐ │   │
-│  │  │ Index Task   │ │ Analyse Task │ │ Patch Task   │ │ Report Task│ │   │
-│  │  │ (async index)│ │ (multi-step) │ │ (gen+test)   │ │ (finalize) │ │   │
+│  │  │ Index Task   │ │ Analyse Task │ │ Webhook Task │ │ Purge Task │ │   │
+│  │  │ (async index)│ │ (multi-step) │ │ (dispatch)   │ │ (weekly)   │ │   │
 │  │  └──────────────┘ └──────────────┘ └──────────────┘ └────────────┘ │   │
+│  │  Queue routing: 'llm' for analyses, 'celery' for others             │   │
+│  │  acks_late + reject_on_worker_lost; DLQ for exhausted retries       │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────────┘
                           │
@@ -76,21 +80,19 @@
 │  └────────────────────────────────────────────────────────────────────────┘  │
 │                                                                             │
 │  ┌────────────────────────────────────────────────────────────────────────┐  │
-│  │                         AI Agents (Python)                             │  │
+│  │                    FastAPI Agent Server (port 8002)                    │  │
 │  │  ┌────────────────┐ ┌────────────────┐ ┌────────────────┐             │  │
-│  │  │ Repository     │ │ Log Analyzer   │ │ Bug Localizer  │             │  │
-│  │  │ Indexer        │ │ (parse logs,   │ │ (retrieve code │             │  │
-│  │  │ (tree-sitter)  │ │  correlate)    │ │  + rank files) │             │  │
+│  │  │ Log Analyzer   │ │ Bug Localizer  │ │ Root Cause     │             │  │
+│  │  │ (parse logs,   │ │ (hybrid search │ │ Agent          │             │  │
+│  │  │  correlate)    │ │  + scoring)    │ │ (RCA chain)    │             │  │
 │  │  └────────────────┘ └────────────────┘ └────────────────┘             │  │
 │  │  ┌────────────────┐ ┌────────────────┐ ┌────────────────┐             │  │
-│  │  │ Root Cause     │ │ Patch Generator│ │ Validation     │             │  │
-│  │  │ Agent          │ │ (diff gen)     │ │ Agent          │             │  │
-│  │  │ (RCA chain)    │ │                │ │ (test+static)  │             │  │
+│  │  │ Patch Generator│ │ Report         │ │ Validation     │             │  │
+│  │  │ (diff gen)     │ │ Generator      │ │ Agent (stub)   │             │  │
 │  │  └────────────────┘ └────────────────┘ └────────────────┘             │  │
 │  │  ┌────────────────┐ ┌────────────────┐                                │  │
-│  │  │ Report         │ │ Embedding      │                                │  │
-│  │  │ Generator      │ │ Generator      │                                │  │
-│  │  │ (doc gen)      │ │ (chunk→vec)    │                                │  │
+│  │  │ Embedding      │ │ Index          │                                │  │
+│  │  │ Generator      │ │ (chunk→vec)    │                                │  │
 │  │  └────────────────┘ └────────────────┘                                │  │
 │  └────────────────────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -103,8 +105,8 @@
 │  │   PostgreSQL + pgvector │  │       Redis            │                     │
 │  │   ├─ Operational data   │  │  ├─ Celery broker      │                     │
 │  │   ├─ Code chunks        │  │  ├─ Celery result back │                     │
-│  │   ├─ Embeddings (vec)   │  │  ├─ Cache (API resp)   │                     │
-│  │   ├─ Vector indexes     │  │  └─ Session store      │                     │
+│  │   ├─ Embeddings (768-d) │  │  ├─ Cache (API resp)   │                     │
+│  │   ├─ HNSW vector index  │  │  └─ Session store      │                     │
 │  │   └─ Full text search   │  │                        │                     │
 │  │   (tsvector)            │  │                        │                     │
 │  │                         │  │                        │                     │
@@ -113,7 +115,6 @@
 │  │   └─ pg_trgm            │  │                        │                     │
 │  └────────────────────────┘  └────────────────────────┘                     │
 └─────────────────────────────────────────────────────────────────────────────┘
-
 ```
 
 ## Container Architecture (Podman Compose)
@@ -124,29 +125,25 @@
 │                                                                             │
 │  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐                  │
 │  │  nginx       │───▶│  django      │───▶│  postgres    │                  │
-│  │  :8080       │    │  :8000       │    │  :5432       │                  │
+│  │  :8080/8443  │    │  :8000       │    │  :5432       │                  │
 │  └──────────────┘    └──────┬───────┘    └──────────────┘                  │
 │                             │                      │                       │
-│                             │              ┌──────────────┐                │
-│                             │              │  pgadmin     │                │
-│                             │              │  optional    │                │
-│                             │              └──────────────┘                │
-│                             ▼                                              │
+│                             ▼                      ▼                       │
 │                      ┌──────────────┐    ┌──────────────┐                 │
-│                      │  redis       │    │  celery_worker│                 │
-│                      │  :6379       │    │  (scalable)   │                 │
-│                      └──────────────┘    └──────┬────────┘                 │
-│                                                  │                         │
-│                                                  ▼                         │
-│                      ┌──────────────┐    ┌──────────────┐                 │
-│                      │  ollama      │    │  sandbox      │                 │
-│                      │  :11434      │    │  (ephemeral)  │                 │
+│                      │  redis       │    │  celery      │                 │
+│                      │  :6379       │    │  worker/beat │                 │
 │                      └──────────────┘    └──────────────┘                 │
 │                                                  │                         │
 │                                                  ▼                         │
 │                      ┌──────────────┐    ┌──────────────┐                 │
-│                      │  minio       │    │  ai-engine    │                 │
-│                      │  (artifacts) │    │  (agents)     │                 │
+│                      │  ollama      │    │  ai-engine   │                 │
+│                      │  :11434      │    │  :8002       │                 │
+│                      └──────────────┘    └──────────────┘                 │
+│                                                  │                         │
+│                                                  ▼                         │
+│                      ┌──────────────┐    ┌──────────────┐                 │
+│                      │  minio       │    │  daphne      │                 │
+│                      │  :9000/9001  │    │  :8001 (WS)  │                 │
 │                      └──────────────┘    └──────────────┘                 │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -169,36 +166,40 @@ Django API
         ▼
 Celery Worker ──▶ run_analysis_pipeline()
   │
-  ├── Step 1: IndexRepository
+  ├── Step 1: IndexRepository (if not indexed)
   │   ├── Check if repo already indexed
   │   ├── If not: clone/fetch via GitService
-  │   ├── Parse AST via Tree-sitter (ai-engine)
+  │   ├── Parse AST via Tree-sitter (local, not ai-engine)
   │   ├── Chunk semantically
-  │   ├── Generate embeddings (Ollama)
-  │   └── Store in pgvector
+  │   ├── Generate embeddings via ai-engine /embed (Ollama)
+  │   └── Store in pgvector (HNSW index)
   │
   ├── Step 2: AnalyzeInput
-  │   ├── Parse logs/stacktrace via LogAnalyzer
+  │   ├── Parse logs/stacktrace via ai-engine /analyze-logs
   │   ├── Extract frames, error types, line numbers
   │   └── Build search queries
   │
   ├── Step 3: BugLocalization
-  │   ├── Hybrid search (pgvector + tsvector)
-  │   ├── Rerank results
+  │   ├── Hybrid search via ai-engine /localize-bug (pgvector + tsvector)
   │   ├── Score files by suspicion
   │   └── Return Top-N candidate files
   │
   ├── Step 4: RootCauseAnalysis
   │   ├── Retrieve full context for candidate files
-  │   ├── Build Ollama prompt with error + code context
-  │   ├── Generate RCA reasoning chain
+  │   ├── Build prompt with error + code context
+  │   ├── Generate RCA via ai-engine /analyze-root-cause
   │   └── Store RCA result
   │
-  └── Step 5: ReportGeneration
-      ├── Format RCA + localization data
-      ├── Generate structured report
-      ├── Update AnalysisRun (status=completed)
-      └── Notify via WebSocket
+  ├── Step 5: FixSuggestion
+  │   ├── Generate diff via ai-engine /suggest-fix
+  │   └── Store Patch + FixSuggestion
+  │
+  ├── Step 6: ReportGeneration
+  │   ├── Format all results via ai-engine /generate-report
+  │   ├── Store Report
+  │   └── Update AnalysisRun (status=completed)
+  │
+  └── Step 7: Notify via WebSocket (real-time)
 ```
 
 ## Deployment Architecture (MVP)
@@ -207,19 +208,23 @@ Celery Worker ──▶ run_analysis_pipeline()
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                         Single Host (MVP)                                │
 │                                                                         │
-│  Host: Ubuntu 24.04 / Fedora 40                                        │
+│  Host: Ubuntu 24.04 / Fedora 40 (WSL2 on Windows)                       │
 │                                                                         │
 │  ┌──────────────────────────────────────────────────────────────────┐   │
 │  │                      Podman Compose                               │   │
 │  │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐  │   │
 │  │  │ Reverse    │  │ Django     │  │ Celery     │  │ PostgreSQL │  │   │
-│  │  │ Proxy/SSL  │  │ (gunicorn) │  │ Worker(s)  │  │ + pgvector  │  │   │
+│  │  │ Proxy + TLS│  │ (runserver)│  │ Worker/Beat│  │ + pgvector │  │   │
 │  │  └────────────┘  └────────────┘  └────────────┘  └────────────┘  │   │
 │  │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐  │   │
 │  │  │ Redis      │  │ Ollama     │  │ MinIO      │  │ AI Engine  │  │   │
-│  │  │            │  │ (GPU if    │  │ (blob      │  │ (agents)   │  │   │
-│  │  │            │  │  avail)    │  │  store)    │  │            │  │   │
+│  │  │            │  │ (CPU only) │  │ (blob      │  │ (FastAPI)  │  │   │
+│  │  │            │  │            │  │  store)    │  │            │  │   │
 │  │  └────────────┘  └────────────┘  └────────────┘  └────────────┘  │   │
+│  │  ┌────────────┐  ┌────────────┐                                │   │
+│  │  │ Daphne     │  │ Nginx      │                                │   │
+│  │  │ (WS :8001) │  │ (:8080/8443)│                                │   │
+│  │  └────────────┘  └────────────┘                                │   │
 │  └──────────────────────────────────────────────────────────────────┘   │
 │                                                                         │
 │  Volumes:                                                               │
@@ -227,8 +232,9 @@ Celery Worker ──▶ run_analysis_pipeline()
 │    redis_data     - Redis persistence                                   │
 │    minio_data     - Artifact storage (patches, reports)                 │
 │    ollama_models  - Ollama model weights                                │
-│    repo_cache     - Cloned repositories                                 │
+│    repo_cache     - Cloned repositories (read-only shared with ai-engine)│
 │    static_volume  - Django collected static files                       │
+│    nginx_certs    - Self-signed TLS certs (auto-generated)              │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -238,9 +244,10 @@ Celery Worker ──▶ run_analysis_pipeline()
 |---|---|---|
 | REST (DRF) | HTTP/JSON | CRUD operations, analysis submission |
 | WebSocket | ASGI (Daphne) | Real-time status updates |
-| Celery Tasks | Redis/AMQP | Async pipeline execution |
-| gRPC (future) | HTTP/2 + protobuf | Agent-to-agent communication |
-| Ollama API | HTTP/JSON (localhost) | LLM inference, embeddings |
+| Celery Tasks | Redis | Async pipeline execution |
+| Django → AI Engine | HTTP/JSON (httpx) | LLM inference, embeddings, analysis steps |
+| Ollama API | HTTP/JSON (localhost) | Model inference, embeddings |
+| Nginx → Django | HTTP (with X-Forwarded-Proto) | Reverse proxy + TLS termination |
 
 ## Scalability Characteristics
 
@@ -248,7 +255,19 @@ Celery Worker ──▶ run_analysis_pipeline()
 |---|---|---|
 | **Concurrent analyses** | Single Celery worker, queue | Multiple workers, priority queues |
 | **Repository size** | <100MB repos, partial index | Streaming index, incremental |
-| **Vector search** | Brute force (pgvector) | IVFFlat → HNSW indexes |
-| **LLM throughput** | Ollama single model | Model sharding, multiple Ollama nodes |
+| **Vector search** | HNSW index (pgvector) | HNSW (already), possibly sharded |
+| **LLM throughput** | Ollama single model (CPU) | GPU Ollama, model sharding, multiple nodes |
 | **Storage** | Monolithic PostgreSQL | Read replicas, sharded chunks |
 | **Frontend** | Single React SPA | SSR (Next.js), CDN caching |
+
+## Security & Hardening (Current State)
+
+- TLS termination on nginx (:8443) with self-signed certs; HSTS opt-in
+- Security headers (CSP, X-Frame-Options, nosniff, Referrer-Policy) at nginx level
+- JWT auth with rotating refresh tokens + blacklist
+- Brute-force lockout via django-axes (5 attempts → 1h cooldown)
+- Webhook secrets encrypted at rest (Fernet)
+- Multi-tenant isolation: project membership, group visibility, owner-only mutations
+- Structured JSON logs with daily rotation (prod)
+- Dead-letter queue for failed Celery tasks
+- Periodic purge: git GC, orphan repo dirs, analysis retention (90d)

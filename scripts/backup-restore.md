@@ -51,3 +51,19 @@ make seed   # only if the base admin user is missing
 4. `make restore DUMP=backups/codecoroner-<latest>.dump`
 5. Verify: log in, open a project/analysis, confirm embeddings still answer (vector search works).
 6. If step 5 fails, fix the runbook — a backup that cannot be restored is not a backup.
+
+## Test evidence (2026-08-19, fresh machine)
+
+Performed on a **fresh WSL2 distro** (Ubuntu 24.04, podman 4.9.3, podman-compose 1.0.6) — no prior state, images pulled from scratch.
+
+1. Copy repo + `backups/` into the fresh distro.
+2. `podman-compose up -d postgres`, wait healthy, then `bash scripts/restore.sh backups/codecoroner-20260818-120151.dump` → `pg_restore --clean` OK.
+3. Verified in restored DB: `accounts_customuser`, `projects_project`, `repositories_repository`, `analyses_analysisrun`, `repositories_codechunk`, `repositories_chunkembedding` all present; vector search (`embedding <-> embedding`) returns rows.
+4. Extracted `repos-20260818-120151.tar.gz` into `codecoroner_repo_cache` → repo dir matches repository id (`ededebd1-…/thefuck`).
+5. `podman-compose up -d` (full stack) + `python manage.py migrate` — applied drift-only migrations (axes lockout tables, `repositories.0006_chunkembedding_hnsw`).
+6. Verified: django `/api/v1/health/` 200, nginx HTTPS 200, login with restored admin OK (JWT), `/api/v1/projects/` and `/api/v1/repositories/` return the restored demo data.
+
+**Conclusion**: the restore procedure works on a machine with no prior state. Two notes for the runbook:
+
+- **Always run `make migrate` after a restore** — backups capture data as of dump time; migrations applied since (e.g. axes, HNSW index) will be applied on top. The runbook already lists this; the fresh test confirms it is required.
+- `restore.sh` referenced an undefined `BACKUP_DIR` in its "Next steps" footer — fixed (defaults to `./backups`).

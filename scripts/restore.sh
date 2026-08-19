@@ -8,6 +8,7 @@ set -a
 [ -f .env ] && . ./.env
 set +a
 
+BACKUP_DIR="${BACKUP_DIR:-./backups}"
 DUMP="${1:-}"
 if [ -z "$DUMP" ]; then
     echo "Usage: $0 <dumpfile>"
