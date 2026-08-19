@@ -4,18 +4,32 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
             name='PlatformSetting',
             fields=[
-                ('id', models.PositiveSmallIntegerField(default=1, editable=False, primary_key=True, serialize=False)),
-                ('model_tier', models.CharField(choices=[('fast', 'Veloce'), ('balanced', 'Equilibrato'), ('precise', 'Preciso')], default='balanced', max_length=20)),
+                (
+                    'id',
+                    models.PositiveSmallIntegerField(
+                        default=1, editable=False, primary_key=True, serialize=False
+                    ),
+                ),
+                (
+                    'model_tier',
+                    models.CharField(
+                        choices=[
+                            ('fast', 'Veloce'),
+                            ('balanced', 'Equilibrato'),
+                            ('precise', 'Preciso'),
+                        ],
+                        default='balanced',
+                        max_length=20,
+                    ),
+                ),
                 ('updated_at', models.DateTimeField(auto_now=True)),
             ],
             options={

@@ -17,10 +17,14 @@ class RepoCrudTests(TestCase):
         self.client = APIClient()
         self.list_url = '/api/v1/repositories/'
         self.user = User.objects.create_user(
-            email='owner@t.com', username='owner', password='pass12345',
+            email='owner@t.com',
+            username='owner',
+            password='pass12345',
         )
         self.other = User.objects.create_user(
-            email='other@t.com', username='other', password='pass12345',
+            email='other@t.com',
+            username='other',
+            password='pass12345',
         )
         self.project = Project.objects.create(name='Test Project', created_by=self.user)
         ProjectMembership.objects.create(project=self.project, user=self.user, role='owner')
@@ -31,11 +35,15 @@ class RepoCrudTests(TestCase):
 
     @patch('repositories.tasks.clone_repository_task.delay')
     def test_1_create_repo_as_member(self, mock_clone):
-        response = self.client.post(self.list_url, {
-            'project': str(self.project.id),
-            'git_url': 'https://github.com/user/repo.git',
-            'git_branch': 'main',
-        }, format='json')
+        response = self.client.post(
+            self.list_url,
+            {
+                'project': str(self.project.id),
+                'git_url': 'https://github.com/user/repo.git',
+                'git_branch': 'main',
+            },
+            format='json',
+        )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['git_url'], 'https://github.com/user/repo.git')
         repo = Repository.objects.get(id=response.data['id'])
@@ -44,27 +52,39 @@ class RepoCrudTests(TestCase):
 
     @patch('repositories.tasks.clone_repository_task.delay')
     def test_2_create_repo_default_branch(self, mock_clone):
-        response = self.client.post(self.list_url, {
-            'project': str(self.project.id),
-            'git_url': 'https://github.com/user/repo.git',
-        }, format='json')
+        response = self.client.post(
+            self.list_url,
+            {
+                'project': str(self.project.id),
+                'git_url': 'https://github.com/user/repo.git',
+            },
+            format='json',
+        )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['git_branch'], 'main')
         mock_clone.assert_called_once()
 
     def test_3_create_repo_as_non_member(self):
         self.client.force_authenticate(user=self.other)
-        response = self.client.post(self.list_url, {
-            'project': str(self.project.id),
-            'git_url': 'https://github.com/user/repo.git',
-        }, format='json')
+        response = self.client.post(
+            self.list_url,
+            {
+                'project': str(self.project.id),
+                'git_url': 'https://github.com/user/repo.git',
+            },
+            format='json',
+        )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_4_create_repo_invalid_git_url(self):
-        response = self.client.post(self.list_url, {
-            'project': str(self.project.id),
-            'git_url': 'not-a-url',
-        }, format='json')
+        response = self.client.post(
+            self.list_url,
+            {
+                'project': str(self.project.id),
+                'git_url': 'not-a-url',
+            },
+            format='json',
+        )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         errors = response.data.get('errors', [])
         fields = [e['field'] for e in errors]
@@ -72,10 +92,14 @@ class RepoCrudTests(TestCase):
 
     def test_5_create_repo_requires_auth(self):
         self.client.force_authenticate(user=None)
-        response = self.client.post(self.list_url, {
-            'project': str(self.project.id),
-            'git_url': 'https://github.com/user/repo.git',
-        }, format='json')
+        response = self.client.post(
+            self.list_url,
+            {
+                'project': str(self.project.id),
+                'git_url': 'https://github.com/user/repo.git',
+            },
+            format='json',
+        )
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_6_list_repos(self):
@@ -114,11 +138,17 @@ class RepoCrudTests(TestCase):
 
     def test_11_patch_repo(self):
         repo = Repository.objects.create(
-            project=self.project, git_url='https://github.com/a/b.git', git_branch='main',
+            project=self.project,
+            git_url='https://github.com/a/b.git',
+            git_branch='main',
         )
-        response = self.client.patch(self._detail_url(repo.id), {
-            'git_branch': 'develop',
-        }, format='json')
+        response = self.client.patch(
+            self._detail_url(repo.id),
+            {
+                'git_branch': 'develop',
+            },
+            format='json',
+        )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         repo.refresh_from_db()
         self.assertEqual(repo.git_branch, 'develop')
@@ -126,7 +156,8 @@ class RepoCrudTests(TestCase):
     def test_12_list_repos_shared_via_group(self):
         team = Group.objects.create(name='team')
         repo = Repository.objects.create(
-            project=self.project, git_url='https://github.com/group/shared.git',
+            project=self.project,
+            git_url='https://github.com/group/shared.git',
         )
         repo.groups.add(team)
         self.other.groups.add(team)
@@ -137,7 +168,9 @@ class RepoCrudTests(TestCase):
 
     def test_13_superuser_sees_all_repos(self):
         admin = User.objects.create_superuser(
-            email='adm@t.com', username='adm', password='pass12345',
+            email='adm@t.com',
+            username='adm',
+            password='pass12345',
         )
         self.client.force_authenticate(user=admin)
         Repository.objects.create(project=self.project, git_url='https://github.com/a/b.git')
@@ -149,7 +182,9 @@ class RepoCrudTests(TestCase):
 
     def test_14_admin_retrieves_repo_of_other_group(self):
         admin = User.objects.create_superuser(
-            email='adm@t.com', username='adm', password='pass12345',
+            email='adm@t.com',
+            username='adm',
+            password='pass12345',
         )
         p2 = Project.objects.create(name='P2', created_by=self.other)
         ProjectMembership.objects.create(project=p2, user=self.other, role='owner')
@@ -161,7 +196,9 @@ class RepoCrudTests(TestCase):
 
     def test_15_admin_can_action_repo_of_other_group(self):
         admin = User.objects.create_superuser(
-            email='adm@t.com', username='adm', password='pass12345',
+            email='adm@t.com',
+            username='adm',
+            password='pass12345',
         )
         p2 = Project.objects.create(name='P2', created_by=self.other)
         ProjectMembership.objects.create(project=p2, user=self.other, role='owner')
@@ -179,10 +216,14 @@ class RepoActionTests(TestCase):
         self.client = APIClient()
         self.list_url = '/api/v1/repositories/'
         self.user = User.objects.create_user(
-            email='owner@t.com', username='owner', password='pass12345',
+            email='owner@t.com',
+            username='owner',
+            password='pass12345',
         )
         self.other = User.objects.create_user(
-            email='other@t.com', username='other', password='pass12345',
+            email='other@t.com',
+            username='other',
+            password='pass12345',
         )
         self.project = Project.objects.create(name='Test Project', created_by=self.user)
         ProjectMembership.objects.create(project=self.project, user=self.user, role='owner')
@@ -218,11 +259,17 @@ class RepoActionTests(TestCase):
     @patch('repositories.tasks.clone_repository_task.delay')
     def test_reindex_clears_files_and_resets(self, mock_clone):
         indexed = IndexedFile.objects.create(
-            repository=self.repo, file_path='a.py', language='python',
+            repository=self.repo,
+            file_path='a.py',
+            language='python',
         )
         CodeChunk.objects.create(
-            file=indexed, chunk_type='module', start_line=1, end_line=1,
-            content='x=1', tokens_count=1,
+            file=indexed,
+            chunk_type='module',
+            start_line=1,
+            end_line=1,
+            content='x=1',
+            tokens_count=1,
         )
         resp = self.client.post(self._action_url(self.repo.id, 'reindex'))
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
@@ -244,7 +291,9 @@ class RepoActionTests(TestCase):
 
     def test_files_action(self):
         IndexedFile.objects.create(
-            repository=self.repo, file_path='a.py', language='python',
+            repository=self.repo,
+            file_path='a.py',
+            language='python',
         )
         resp = self.client.get(self._action_url(self.repo.id, 'files'))
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
@@ -260,11 +309,17 @@ class RepoActionTests(TestCase):
 
     def test_chunks_action(self):
         indexed = IndexedFile.objects.create(
-            repository=self.repo, file_path='a.py', language='python',
+            repository=self.repo,
+            file_path='a.py',
+            language='python',
         )
         CodeChunk.objects.create(
-            file=indexed, chunk_type='module', start_line=1, end_line=1,
-            content='x=1', tokens_count=1,
+            file=indexed,
+            chunk_type='module',
+            start_line=1,
+            end_line=1,
+            content='x=1',
+            tokens_count=1,
         )
         resp = self.client.get(self._action_url(self.repo.id, 'chunks'))
         self.assertEqual(resp.status_code, status.HTTP_200_OK)

@@ -1,6 +1,6 @@
 import logging
+
 from celery import shared_task
-from django.db import transaction
 
 logger = logging.getLogger(__name__)
 
@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 def run_analysis_pipeline(self, analysis_id: str):
     from .models import Analysis
     from .orchestrator import AnalysisOrchestrator
+
     try:
         analysis = Analysis.objects.get(id=analysis_id)
         orchestrator = AnalysisOrchestrator(analysis)
@@ -17,4 +18,4 @@ def run_analysis_pipeline(self, analysis_id: str):
         logger.error(f'Analysis {analysis_id} not found')
     except Exception as exc:
         logger.exception(f'Pipeline failed for analysis {analysis_id}')
-        raise self.retry(exc=exc)
+        self.retry(exc=exc)

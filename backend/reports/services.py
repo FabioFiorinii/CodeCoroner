@@ -13,6 +13,7 @@ class ReportService:
 
     def generate_html(self, markdown: str) -> str:
         import markdown as md
+
         return md.markdown(markdown, extensions=['fenced_code', 'tables'])
 
     def generate_pdf(self, html: str) -> bytes:

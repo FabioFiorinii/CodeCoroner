@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('analyses', '0005_analysis_parent_analysis'),
     ]
@@ -13,6 +12,22 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='analysis',
             name='status',
-            field=models.CharField(choices=[('queued', 'Queued'), ('indexing', 'Indexing'), ('analyzing', 'Analyzing'), ('bug_localization', 'Bug Localization'), ('rca', 'Rca'), ('patching', 'Patching'), ('validating', 'Validating'), ('fix_suggestion', 'Fix Suggestion'), ('generate_report', 'Generate Report'), ('completed', 'Completed'), ('failed', 'Failed')], default='queued', max_length=20),
+            field=models.CharField(
+                choices=[
+                    ('queued', 'Queued'),
+                    ('indexing', 'Indexing'),
+                    ('analyzing', 'Analyzing'),
+                    ('bug_localization', 'Bug Localization'),
+                    ('rca', 'Rca'),
+                    ('patching', 'Patching'),
+                    ('validating', 'Validating'),
+                    ('fix_suggestion', 'Fix Suggestion'),
+                    ('generate_report', 'Generate Report'),
+                    ('completed', 'Completed'),
+                    ('failed', 'Failed'),
+                ],
+                default='queued',
+                max_length=20,
+            ),
         ),
     ]

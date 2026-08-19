@@ -1,8 +1,17 @@
-from django.urls import path, include
+from django.urls import include, path
 from rest_framework.routers import DefaultRouter
-from rest_framework_simplejwt.views import TokenRefreshView, TokenBlacklistView
-from .views import RegisterView, LoginView, UserDetailView, UserAdminViewSet, GroupViewSet, ChangePasswordView
+from rest_framework_simplejwt.views import TokenBlacklistView, TokenRefreshView
+
 from common.views import ModelSettingsView
+
+from .views import (
+    ChangePasswordView,
+    GroupViewSet,
+    LoginView,
+    RegisterView,
+    UserAdminViewSet,
+    UserDetailView,
+)
 
 admin_router = DefaultRouter()
 admin_router.register(r'users', UserAdminViewSet, basename='admin-user')

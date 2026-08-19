@@ -20,13 +20,19 @@ class AnalysisVisibilityTests(TestCase):
         self.group_a = Group.objects.create(name='GroupA')
         self.group_b = Group.objects.create(name='GroupB')
         self.alice = User.objects.create_user(
-            email='alice@t.com', username='alice', password='pass12345',
+            email='alice@t.com',
+            username='alice',
+            password='pass12345',
         )
         self.bob = User.objects.create_user(
-            email='bob@t.com', username='bob', password='pass12345',
+            email='bob@t.com',
+            username='bob',
+            password='pass12345',
         )
         self.admin = User.objects.create_superuser(
-            email='admin@t.com', username='admin', password='pass12345',
+            email='admin@t.com',
+            username='admin',
+            password='pass12345',
         )
         self.alice.groups.add(self.group_a)
         self.bob.groups.add(self.group_b)
@@ -50,10 +56,16 @@ class AnalysisVisibilityTests(TestCase):
         )
 
         self.analysis_a = Analysis.objects.create(
-            user=self.alice, project=self.proj_a, repository=self.repo_a, title='A bug',
+            user=self.alice,
+            project=self.proj_a,
+            repository=self.repo_a,
+            title='A bug',
         )
         self.analysis_b = Analysis.objects.create(
-            user=self.bob, project=self.proj_b, repository=self.repo_b, title='B bug',
+            user=self.bob,
+            project=self.proj_b,
+            repository=self.repo_b,
+            title='B bug',
         )
 
     def test_1_admin_sees_all_analyses(self):
@@ -86,12 +98,16 @@ class AnalysisVisibilityTests(TestCase):
             project=self.proj_a,
         )
         with patch('analyses.tasks.run_analysis_pipeline.delay') as mock_pipeline:
-            response = self.client.post(self.list_url, {
-                'project': str(self.proj_a.id),
-                'repository': str(repo.id),
-                'title': 'New',
-                'error_context': {'error_message': 'boom'},
-            }, format='json')
+            response = self.client.post(
+                self.list_url,
+                {
+                    'project': str(self.proj_a.id),
+                    'repository': str(repo.id),
+                    'title': 'New',
+                    'error_context': {'error_message': 'boom'},
+                },
+                format='json',
+            )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('not ready', str(response.data))
         mock_pipeline.assert_not_called()
@@ -104,13 +120,17 @@ class AnalysisVisibilityTests(TestCase):
             project=self.proj_a,
         )
         with patch('analyses.tasks.run_analysis_pipeline.delay') as mock_pipeline:
-            response = self.client.post(self.list_url, {
-                'project': str(self.proj_a.id),
-                'repository': str(self.repo_a.id),
-                'repository_ids': [str(self.repo_a.id), str(repo_pending.id)],
-                'title': 'New',
-                'error_context': {'error_message': 'boom'},
-            }, format='json')
+            response = self.client.post(
+                self.list_url,
+                {
+                    'project': str(self.proj_a.id),
+                    'repository': str(self.repo_a.id),
+                    'repository_ids': [str(self.repo_a.id), str(repo_pending.id)],
+                    'title': 'New',
+                    'error_context': {'error_message': 'boom'},
+                },
+                format='json',
+            )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('not ready', str(response.data))
         mock_pipeline.assert_not_called()
@@ -118,11 +138,15 @@ class AnalysisVisibilityTests(TestCase):
     @patch('analyses.tasks.run_analysis_pipeline.delay')
     def test_6_create_allowed_when_repo_indexed(self, mock_pipeline):
         self.client.force_authenticate(user=self.alice)
-        response = self.client.post(self.list_url, {
-            'project': str(self.proj_a.id),
-            'repository': str(self.repo_a.id),
-            'title': 'New',
-            'error_context': {'error_message': 'boom'},
-        }, format='json')
+        response = self.client.post(
+            self.list_url,
+            {
+                'project': str(self.proj_a.id),
+                'repository': str(self.repo_a.id),
+                'title': 'New',
+                'error_context': {'error_message': 'boom'},
+            },
+            format='json',
+        )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         mock_pipeline.assert_called_once()

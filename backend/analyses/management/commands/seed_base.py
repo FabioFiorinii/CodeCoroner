@@ -32,9 +32,11 @@ def ensure_base():
 class Command(BaseCommand):
     help = 'Create the base install data: admin user and default group'
 
-    def handle(self, *args, **options):
+    def handle(self, *_args, **_options):  # noqa: ARG002
         user, group, created = ensure_base()
-        self.stdout.write(self.style.SUCCESS(
-            f'Base seed ok: {user.email} ({"created" if created else "existing"}) '
-            f'in group "{group.name}"'
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(
+                f'Base seed ok: {user.email} ({"created" if created else "existing"}) '
+                f'in group "{group.name}"'
+            )
+        )

@@ -182,9 +182,7 @@ class AnalysisOrchestrator:
             ok &= self._run_step_if_enabled(
                 'bug_localization', Analysis.Status.BUG_LOCALIZATION, self._localize_bug
             )
-            ok &= self._run_step_if_enabled(
-                'root_cause', Analysis.Status.RCA, self._root_cause
-            )
+            ok &= self._run_step_if_enabled('root_cause', Analysis.Status.RCA, self._root_cause)
             ok &= self._run_step_if_enabled(
                 'fix_suggestion', Analysis.Status.FIX_SUGGESTION, self._suggest_fix
             )

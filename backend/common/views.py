@@ -14,7 +14,7 @@ MODELS_TIMEOUT = 10
 
 
 class IsSuperUser(permissions.BasePermission):
-    def has_permission(self, request, view):
+    def has_permission(self, request, _view):  # noqa: ARG002
         return request.user and request.user.is_authenticated and request.user.is_superuser
 
 
@@ -42,11 +42,13 @@ class HealthView(APIView):
         except Exception:
             ai_ok = False
         status = 'healthy' if (db_ok and ai_ok) else 'degraded'
-        return Response({
-            'status': status,
-            'database': db_ok,
-            'ai_engine': ai_ok,
-        })
+        return Response(
+            {
+                'status': status,
+                'database': db_ok,
+                'ai_engine': ai_ok,
+            }
+        )
 
 
 class ModelSettingsSerializer(serializers.Serializer):
@@ -94,27 +96,33 @@ class ModelSettingsView(APIView):
             timeout=TEST_TIMEOUT,
         )
         if resp.status_code != 200:
-            raise RuntimeError(_error_detail(resp) or f'Model {model} downloaded but failed verification')
+            raise RuntimeError(
+                _error_detail(resp) or f'Model {model} downloaded but failed verification'
+            )
 
-    def get(self, request):
+    def get(self, _request):
         setting = PlatformSetting.get_solo()
         installed = self._installed_models()
         available = []
         for key, cfg in settings.MODEL_TIERS.items():
             models = list(dict.fromkeys([cfg['llm_model'], cfg['rca_model']]))
-            available.append({
-                'key': key,
-                'label': cfg['label'],
-                'model': models[0] if len(models) == 1 else models,
-                'params': cfg['params'],
-                'installed': all(m in installed for m in models),
-            })
-        return Response({
-            'tier': setting.model_tier,
-            'model': settings.MODEL_TIERS[setting.model_tier]['llm_model'],
-            'available': available,
-            'pipeline': self._pipeline_map(setting),
-        })
+            available.append(
+                {
+                    'key': key,
+                    'label': cfg['label'],
+                    'model': models[0] if len(models) == 1 else models,
+                    'params': cfg['params'],
+                    'installed': all(m in installed for m in models),
+                }
+            )
+        return Response(
+            {
+                'tier': setting.model_tier,
+                'model': settings.MODEL_TIERS[setting.model_tier]['llm_model'],
+                'available': available,
+                'pipeline': self._pipeline_map(setting),
+            }
+        )
 
     def patch(self, request):
         payload = request.data.get('pipeline')
@@ -133,10 +141,12 @@ class ModelSettingsView(APIView):
         setting = PlatformSetting.get_solo()
         setting.disabled_pipeline_steps = disabled
         setting.save(update_fields=['disabled_pipeline_steps', 'updated_at'])
-        return Response({
-            'detail': 'Pipeline settings saved',
-            'pipeline': self._pipeline_map(setting),
-        })
+        return Response(
+            {
+                'detail': 'Pipeline settings saved',
+                'pipeline': self._pipeline_map(setting),
+            }
+        )
 
     def put(self, request):
         serializer = ModelSettingsSerializer(data=request.data)
@@ -158,8 +168,10 @@ class ModelSettingsView(APIView):
         setting = PlatformSetting.get_solo()
         setting.model_tier = new_tier
         setting.save(update_fields=['model_tier', 'updated_at'])
-        return Response({
-            'detail': 'Model profile saved and verified',
-            'tier': new_tier,
-            'model': cfg['llm_model'],
-        })
+        return Response(
+            {
+                'detail': 'Model profile saved and verified',
+                'tier': new_tier,
+                'model': cfg['llm_model'],
+            }
+        )

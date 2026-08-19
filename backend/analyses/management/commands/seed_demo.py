@@ -1,12 +1,23 @@
 import uuid
 from datetime import timedelta
-from django.utils import timezone
-from django.core.management.base import BaseCommand
+
 from django.contrib.auth import get_user_model
+from django.core.management.base import BaseCommand
+from django.utils import timezone
+
+from analyses.models import (
+    Analysis,
+    AnalysisRun,
+    BugLocalization,
+    FixSuggestion,
+    Report,
+    RootCause,
+    SuspiciousFileScore,
+)
 from projects.models import Project, ProjectMembership
 from repositories.models import Repository
-from analyses.models import Analysis, AnalysisRun, BugLocalization, SuspiciousFileScore, RootCause, FixSuggestion, Report
-from .seed_base import ensure_base, ADMIN_EMAIL, ADMIN_PASSWORD
+
+from .seed_base import ADMIN_EMAIL, ADMIN_PASSWORD, ensure_base
 
 User = get_user_model()
 
@@ -16,7 +27,7 @@ FIXED_NOW = timezone.now() - timedelta(hours=2)
 class Command(BaseCommand):
     help = 'Seed the database with demo data for showcase'
 
-    def handle(self, *args, **options):
+    def handle(self, *_args, **_options):  # noqa: ARG002
         self.stdout.write('Seeding demo data...')
 
         admin, default_group, _ = ensure_base()
@@ -82,7 +93,7 @@ class Command(BaseCommand):
                     'error_message': 'jinja2.exceptions.TemplateNotFound: index.html',
                     'environment': 'Flask 3.1, Python 3.13, Jinja2 3.1.5',
                     'description': 'When accessing the root URL (/), the application raises a TemplateNotFound exception. The index route handler calls render_template("index.html") but the template file is placed in the wrong directory.',
-                    'stacktrace': '''Traceback (most recent call last):
+                    'stacktrace': """Traceback (most recent call last):
   File "/app/venv/lib/python3.13/site-packages/flask/app.py", line 1521, in wsgi_app
     response = self.full_dispatch_request()
   File "/app/venv/lib/python3.13/site-packages/flask/app.py", line 876, in full_dispatch_request
@@ -97,7 +108,7 @@ class Command(BaseCommand):
     return _render(app, template, context)
   File "/app/venv/lib/python3.13/site-packages/flask/templating.py", line 120, in _render
     raise TemplateNotFound(template)
-jinja2.exceptions.TemplateNotFound: TemplateNotFound: index.html''',
+jinja2.exceptions.TemplateNotFound: TemplateNotFound: index.html""",
                     'steps_to_reproduce': '1. Start the Flask app with "python app.py"\n2. Open http://localhost:5000 in browser\n3. Observe 500 Internal Server Error\n4. Check server logs for TemplateNotFound',
                     'logs': ' * Running on http://127.0.0.1:5000\n[2026-07-28 15:23:01] GET / → 500 Internal Server Error\n',
                 },
@@ -117,10 +128,12 @@ jinja2.exceptions.TemplateNotFound: TemplateNotFound: index.html''',
         else:
             self.stdout.write(f'  Analysis already exists: {analysis.title}')
 
-        self.stdout.write(self.style.SUCCESS(
-            f'\nDemo data ready! Login with: {ADMIN_EMAIL} / {ADMIN_PASSWORD} '
-            '(bob@codecoroner.dev / bobpass, alice@codecoroner.dev / alicepass)'
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(
+                f'\nDemo data ready! Login with: {ADMIN_EMAIL} / {ADMIN_PASSWORD} '
+                '(bob@codecoroner.dev / bobpass, alice@codecoroner.dev / alicepass)'
+            )
+        )
 
     def _create_runs(self, analysis):
         steps = [
@@ -154,9 +167,24 @@ jinja2.exceptions.TemplateNotFound: TemplateNotFound: index.html''',
             },
         )
         suspicious = [
-            ('app/app.py', 0.92, 'Line 12 calls render_template("index.html") — this is where the crash originates', 1),
-            ('app/templates/index.html', 0.85, 'Template file exists but is in the wrong location. Flask expects templates/template_name', 2),
-            ('venv/lib/python3.13/site-packages/flask/templating.py', 0.45, 'The _render() function raises TemplateNotFound when the template path is wrong — standard Flask behavior', 3),
+            (
+                'app/app.py',
+                0.92,
+                'Line 12 calls render_template("index.html") — this is where the crash originates',
+                1,
+            ),
+            (
+                'app/templates/index.html',
+                0.85,
+                'Template file exists but is in the wrong location. Flask expects templates/template_name',
+                2,
+            ),
+            (
+                'venv/lib/python3.13/site-packages/flask/templating.py',
+                0.45,
+                'The _render() function raises TemplateNotFound when the template path is wrong — standard Flask behavior',
+                3,
+            ),
         ]
         for file_path, score, evidence, rank in suspicious:
             SuspiciousFileScore.objects.get_or_create(
@@ -187,7 +215,7 @@ jinja2.exceptions.TemplateNotFound: TemplateNotFound: index.html''',
         FixSuggestion.objects.get_or_create(
             analysis=analysis,
             defaults={
-                'diff': '''--- a/app/app.py
+                'diff': """--- a/app/app.py
 +++ b/app/app.py
 @@ -9,7 +9,7 @@ app = Flask(__name__)
 
@@ -208,20 +236,20 @@ jinja2.exceptions.TemplateNotFound: TemplateNotFound: index.html''',
 +    <h1>Hello, Flask!</h1>
 +    <p>Application is running correctly.</p>
 +</body>
-+</html>''',
-                'plan': '''File: app/app.py
++</html>""",
+                'plan': """File: app/app.py
 Line 12: change render_template("index.html") → render_template("main/index.html")
 
 File: (create new) app/templates/main/index.html
 Lines 1-12: create a basic HTML template with DOCTYPE, html, head, body, h1 "Hello, Flask!" and a paragraph.
 
 Move any existing index.html from app/ into app/templates/main/index.html.
-No other files need modification.''',
-                'explanation': '''The bug is a directory structure mismatch. Flask's default template loader looks for templates inside a "templates/" directory under the app package. The index.html file was placed at the project root (app/index.html) instead of app/templates/index.html, causing jinja2 to raise TemplateNotFound.
+No other files need modification.""",
+                'explanation': """The bug is a directory structure mismatch. Flask's default template loader looks for templates inside a "templates/" directory under the app package. The index.html file was placed at the project root (app/index.html) instead of app/templates/index.html, causing jinja2 to raise TemplateNotFound.
 
 The fix moves the template into the correct directory and optionally organizes it under a "main/" subdirectory for better route separation. The render_template() call is updated to reflect the new path.
 
-No side effects are expected — this only affects the template resolution path. If other routes also use templates, verify they follow the same convention. The app logic and data flow remain unchanged.''',
+No side effects are expected — this only affects the template resolution path. If other routes also use templates, verify they follow the same convention. The app logic and data flow remain unchanged.""",
             },
         )
 
@@ -230,7 +258,7 @@ No side effects are expected — this only affects the template resolution path.
             analysis=analysis,
             defaults={
                 'format': 'markdown',
-                'markdown': '''# Analysis Report: TemplateNotFound on index route
+                'markdown': """# Analysis Report: TemplateNotFound on index route
 
 ## Summary
 The application crashes with a `jinja2.exceptions.TemplateNotFound` when accessing the root URL. The root cause is a missing `templates/` directory structure.
@@ -260,6 +288,6 @@ render_template() looks for templates inside a "templates/" directory (Flask def
 
 ## Recommendation
 Always place Flask templates inside a `templates/` subdirectory within the app package. This is a Flask convention that avoids TemplateNotFound errors.
-''',
+""",
             },
         )

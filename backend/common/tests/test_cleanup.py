@@ -19,7 +19,9 @@ User = get_user_model()
 class CleanupTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
-            email='owner@t.com', username='owner', password='pass12345',
+            email='owner@t.com',
+            username='owner',
+            password='pass12345',
         )
         self.project = Project.objects.create(name='P', created_by=self.user)
         self.repo = Repository.objects.create(
@@ -64,9 +66,10 @@ class CleanupTests(TestCase):
             orphan.mkdir()
             known = Path(tmp) / str(self.repo.id)
             known.mkdir()
-            with patch.object(cleanup, 'REPOS_ROOT', Path(tmp)), patch(
-                'common.cleanup.shutil.rmtree'
-            ) as mock_rmtree:
+            with (
+                patch.object(cleanup, 'REPOS_ROOT', Path(tmp)),
+                patch('common.cleanup.shutil.rmtree') as mock_rmtree,
+            ):
                 removed = cleanup.prune_orphan_repo_dirs()
             self.assertEqual(removed, 1)
             mock_rmtree.assert_called_once_with(orphan, ignore_errors=True)

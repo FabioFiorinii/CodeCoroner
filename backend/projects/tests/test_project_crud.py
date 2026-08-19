@@ -7,15 +7,20 @@ from projects.models import Project, ProjectMembership
 
 User = get_user_model()
 
+
 class ProjectCrudTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.list_url = '/api/v1/projects/'
         self.user = User.objects.create_user(
-            email='owner@test.com', username='owner', password='pass12345',
+            email='owner@test.com',
+            username='owner',
+            password='pass12345',
         )
         self.other = User.objects.create_user(
-            email='other@test.com', username='other', password='pass12345',
+            email='other@test.com',
+            username='other',
+            password='pass12345',
         )
         self.client.force_authenticate(user=self.user)
 
@@ -23,10 +28,14 @@ class ProjectCrudTests(TestCase):
         return f'/api/v1/projects/{project_id}/'
 
     def test_1_create_project(self):
-        response = self.client.post(self.list_url, {
-            'name': 'My Project',
-            'description': 'A test project',
-        }, format='json')
+        response = self.client.post(
+            self.list_url,
+            {
+                'name': 'My Project',
+                'description': 'A test project',
+            },
+            format='json',
+        )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['name'], 'My Project')
         self.assertEqual(response.data['member_count'], 1)
@@ -36,7 +45,9 @@ class ProjectCrudTests(TestCase):
         self.assertEqual(project.created_by, self.user)
         self.assertTrue(
             ProjectMembership.objects.filter(
-                project=project, user=self.user, role='owner',
+                project=project,
+                user=self.user,
+                role='owner',
             ).exists()
         )
 
@@ -67,9 +78,13 @@ class ProjectCrudTests(TestCase):
     def test_5_update_project(self):
         project = Project.objects.create(name='Old Name', created_by=self.user)
         ProjectMembership.objects.create(project=project, user=self.user, role='owner')
-        response = self.client.patch(self._detail_url(project.id), {
-            'name': 'New Name',
-        }, format='json')
+        response = self.client.patch(
+            self._detail_url(project.id),
+            {
+                'name': 'New Name',
+            },
+            format='json',
+        )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['name'], 'New Name')
 
@@ -100,7 +115,9 @@ class ProjectCrudTests(TestCase):
 
     def test_10_admin_sees_all_projects(self):
         admin = User.objects.create_superuser(
-            email='admin@t.com', username='admin', password='pass12345',
+            email='admin@t.com',
+            username='admin',
+            password='pass12345',
         )
         self.client.force_authenticate(user=admin)
         Project.objects.create(name='P1', created_by=self.user)
@@ -113,7 +130,9 @@ class ProjectCrudTests(TestCase):
 
     def test_11_admin_retrieves_project_of_other_group(self):
         admin = User.objects.create_superuser(
-            email='admin@t.com', username='admin', password='pass12345',
+            email='admin@t.com',
+            username='admin',
+            password='pass12345',
         )
         self.client.force_authenticate(user=admin)
         project = Project.objects.create(name='Others', created_by=self.other)

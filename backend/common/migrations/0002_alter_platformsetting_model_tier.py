@@ -3,13 +3,12 @@
 from django.db import migrations, models
 
 
-def set_default_tier(apps, schema_editor):
+def set_default_tier(apps, _schema_editor):  # noqa: ARG001
     PlatformSetting = apps.get_model('common', 'PlatformSetting')
     PlatformSetting.objects.filter(pk=1).update(model_tier='fast')
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('common', '0001_initial'),
     ]
@@ -18,7 +17,11 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='platformsetting',
             name='model_tier',
-            field=models.CharField(choices=[('fast', 'Fast'), ('balanced', 'Balanced'), ('precise', 'Precise')], default='fast', max_length=20),
+            field=models.CharField(
+                choices=[('fast', 'Fast'), ('balanced', 'Balanced'), ('precise', 'Precise')],
+                default='fast',
+                max_length=20,
+            ),
         ),
         migrations.RunPython(set_default_tier, migrations.RunPython.noop),
     ]

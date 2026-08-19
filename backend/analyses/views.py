@@ -72,7 +72,7 @@ class AnalysisViewSet(viewsets.ModelViewSet):
         return [root, *root.children.order_by('created_at')]
 
     @action(detail=True, methods=['get', 'delete'], url_path='thread')
-    def thread(self, request, pk=None):
+    def thread(self, request, pk=None):  # noqa: ARG002
         analysis = self.get_object()
         root = analysis.parent_analysis or analysis
         if request.method == 'DELETE':
@@ -86,7 +86,7 @@ class AnalysisViewSet(viewsets.ModelViewSet):
         serializer = AnalysisSerializer(self._thread(analysis), many=True)
         return Response(serializer.data)
 
-    def create(self, request, *args, **kwargs):
+    def create(self, request, *_args, **_kwargs):  # noqa: ARG002
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         analysis = serializer.save(user=self.request.user)
@@ -95,16 +95,20 @@ class AnalysisViewSet(viewsets.ModelViewSet):
         run_analysis_pipeline.delay(str(analysis.id))
         from webhooks.services import dispatch
 
-        dispatch(analysis.project_id, 'analysis.created', {
-            'id': str(analysis.id),
-            'title': analysis.title,
-            'status': analysis.status,
-            'project': str(analysis.project_id),
-        })
+        dispatch(
+            analysis.project_id,
+            'analysis.created',
+            {
+                'id': str(analysis.id),
+                'title': analysis.title,
+                'status': analysis.status,
+                'project': str(analysis.project_id),
+            },
+        )
         out = AnalysisSerializer(analysis, context=self.get_serializer_context())
         return Response(out.data, status=status.HTTP_201_CREATED)
 
-    def destroy(self, request, *args, **kwargs):
+    def destroy(self, request, *args, **kwargs):  # noqa: ARG002
         analysis = self.get_object()
         if not request.user.is_superuser and analysis.user != request.user:
             return Response(
@@ -114,7 +118,7 @@ class AnalysisViewSet(viewsets.ModelViewSet):
         return super().destroy(request, *args, **kwargs)
 
     @action(detail=True, methods=['get'])
-    def status(self, request, pk=None):
+    def status(self, request, pk=None):  # noqa: ARG002
         analysis = self.get_object()
         return Response(
             {
@@ -137,7 +141,7 @@ class AnalysisViewSet(viewsets.ModelViewSet):
         )
 
     @action(detail=True, methods=['get'])
-    def localization(self, request, pk=None):
+    def localization(self, request, pk=None):  # noqa: ARG002
         analysis = self.get_object()
         if not hasattr(analysis, 'bug_localization'):
             return Response(
@@ -147,7 +151,7 @@ class AnalysisViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     @action(detail=True, methods=['get'])
-    def root_cause(self, request, pk=None):
+    def root_cause(self, request, pk=None):  # noqa: ARG002
         analysis = self.get_object()
         if not hasattr(analysis, 'root_cause'):
             return Response(
@@ -158,7 +162,7 @@ class AnalysisViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     @action(detail=True, methods=['get'])
-    def patch(self, request, pk=None):
+    def patch(self, request, pk=None):  # noqa: ARG002
         analysis = self.get_object()
         if not hasattr(analysis, 'patch'):
             return Response(
@@ -170,7 +174,7 @@ class AnalysisViewSet(viewsets.ModelViewSet):
         return Response(data)
 
     @action(detail=True, methods=['get'])
-    def fix_suggestion(self, request, pk=None):
+    def fix_suggestion(self, request, pk=None):  # noqa: ARG002
         analysis = self.get_object()
         if not hasattr(analysis, 'fix_suggestion'):
             return Response(
@@ -180,7 +184,7 @@ class AnalysisViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     @action(detail=True, methods=['get'])
-    def report(self, request, pk=None):
+    def report(self, request, pk=None):  # noqa: ARG002
         analysis = self.get_object()
         if not hasattr(analysis, 'report'):
             return Response(

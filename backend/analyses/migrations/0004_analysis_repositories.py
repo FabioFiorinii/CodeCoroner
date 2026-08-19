@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('analyses', '0003_alter_analysis_status_fixsuggestion'),
         ('repositories', '0002_repository_assigned_projects_and_more'),
@@ -14,6 +13,8 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='analysis',
             name='repositories',
-            field=models.ManyToManyField(blank=True, related_name='analysis_records', to='repositories.repository'),
+            field=models.ManyToManyField(
+                blank=True, related_name='analysis_records', to='repositories.repository'
+            ),
         ),
     ]

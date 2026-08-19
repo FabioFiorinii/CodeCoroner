@@ -1,13 +1,19 @@
-from rest_framework import generics, permissions, status, viewsets, serializers
+from django.contrib.auth.models import Group
+from rest_framework import generics, permissions, serializers, status, viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from django.contrib.auth.models import Group
-from .serializers import RegisterSerializer, LoginSerializer, UserSerializer, ChangePasswordSerializer
+
 from .models import User
+from .serializers import (
+    ChangePasswordSerializer,
+    LoginSerializer,
+    RegisterSerializer,
+    UserSerializer,
+)
 
 
 class IsSuperUser(permissions.BasePermission):
-    def has_permission(self, request, view):
+    def has_permission(self, request, _view):  # noqa: ARG002
         return request.user and request.user.is_authenticated and request.user.is_superuser
 
 
@@ -40,11 +46,12 @@ class GroupViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated, IsSuperUser]
     pagination_class = None
 
+
 class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]
 
-    def create(self, request, *args, **kwargs):
+    def create(self, request, *_args, **_kwargs):  # noqa: ARG002
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
@@ -52,6 +59,7 @@ class RegisterView(generics.CreateAPIView):
             UserSerializer(user).data,
             status=status.HTTP_201_CREATED,
         )
+
 
 class LoginView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -61,12 +69,14 @@ class LoginView(APIView):
         serializer.is_valid(raise_exception=True)
         return Response(serializer.validated_data, status=status.HTTP_200_OK)
 
+
 class UserDetailView(generics.RetrieveUpdateAPIView):
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_object(self):
         return self.request.user
+
 
 class ChangePasswordView(APIView):
     permission_classes = [permissions.IsAuthenticated]

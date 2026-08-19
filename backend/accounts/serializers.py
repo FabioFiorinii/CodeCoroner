@@ -24,6 +24,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         user.groups.add(default_group)
         return user
 
+
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
@@ -37,9 +38,7 @@ class LoginSerializer(serializers.Serializer):
         )
         if not user or not user.is_active:
             if getattr(request, 'axes_locked_out', None):
-                raise PermissionDenied(
-                    'Account temporarily locked after too many failed attempts.'
-                )
+                raise PermissionDenied('Account temporarily locked after too many failed attempts.')
             raise serializers.ValidationError('Invalid email or password.')
         refresh = RefreshToken.for_user(user)
         return {
@@ -48,15 +47,28 @@ class LoginSerializer(serializers.Serializer):
             'user': UserSerializer(user).data,
         }
 
+
 class UserSerializer(serializers.ModelSerializer):
     groups = serializers.SlugRelatedField(
-        many=True, slug_field='name', queryset=Group.objects.all(),
+        many=True,
+        slug_field='name',
+        queryset=Group.objects.all(),
     )
 
     class Meta:
         model = User
-        fields = ['id', 'email', 'username', 'is_active', 'is_superuser', 'date_joined', 'api_rate_limit', 'groups']
+        fields = [
+            'id',
+            'email',
+            'username',
+            'is_active',
+            'is_superuser',
+            'date_joined',
+            'api_rate_limit',
+            'groups',
+        ]
         read_only_fields = ['id', 'is_active', 'is_superuser', 'date_joined']
+
 
 class ChangePasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField(write_only=True)

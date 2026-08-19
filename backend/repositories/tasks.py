@@ -71,7 +71,7 @@ IGNORED_EXTENSIONS = {
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=30)
-def clone_repository_task(self, repo_id: str):
+def clone_repository_task(_self, repo_id: str):
     try:
         repo = Repository.objects.get(id=repo_id)
     except Repository.DoesNotExist:
@@ -93,7 +93,7 @@ def clone_repository_task(self, repo_id: str):
 
 
 @shared_task(bind=True, max_retries=2, default_retry_delay=60)
-def index_repository_task(self, repo_id: str):
+def index_repository_task(_self, repo_id: str):
     try:
         repo = Repository.objects.get(id=repo_id)
     except Repository.DoesNotExist:
@@ -168,7 +168,7 @@ def index_repository_task(self, repo_id: str):
 
 
 def _chunk_source(
-    indexed_file: IndexedFile, file_path: Path, content: bytes, language: str
+    _indexed_file: IndexedFile, file_path: Path, content: bytes, language: str
 ) -> list[dict]:
     try:
         source = content.decode('utf-8')
@@ -208,7 +208,7 @@ def _save_chunks(indexed_file: IndexedFile, chunk_data: list[dict]):
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=30)
-def generate_embeddings_task(self, repo_id: str):
+def generate_embeddings_task(_self, repo_id: str):
     try:
         repo = Repository.objects.get(id=repo_id)
     except Repository.DoesNotExist:
@@ -317,7 +317,7 @@ def _set_error(repo: Repository, message: str):
 
 
 @shared_task(bind=True, max_retries=1)
-def run_daily_pulls(self):
+def run_daily_pulls(_self):
     repos = Repository.objects.filter(auto_pull=True)
     busy = (Repository.Status.CLONING, Repository.Status.INDEXING)
     pulled = skipped = 0

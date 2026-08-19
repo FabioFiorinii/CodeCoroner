@@ -3,9 +3,11 @@ import os
 from celery import Celery
 from celery.schedules import crontab
 
+from common.celery import DLQTask
+
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.dev')
 
-app = Celery('codecoroner')
+app = Celery('codecoroner', task_cls=DLQTask)
 app.config_from_object('django.conf:settings', namespace='CELERY')
 app.autodiscover_tasks()
 

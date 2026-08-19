@@ -14,12 +14,13 @@ def _is_owner(request, project):
     if request.user.is_superuser:
         return True
     return project.memberships.filter(
-        user=request.user, role=ProjectMembership.Role.OWNER,
+        user=request.user,
+        role=ProjectMembership.Role.OWNER,
     ).exists()
 
 
 class IsProjectMember(permissions.BasePermission):
-    def has_object_permission(self, request, view, obj):
+    def has_object_permission(self, request, _view, obj):  # noqa: ARG002
         if request.user.is_superuser:
             return True
         project = obj.project if hasattr(obj, 'project') else obj
@@ -43,7 +44,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         return qs.distinct().prefetch_related('memberships__user').order_by('-created_at')
 
     @action(detail=True, methods=['get', 'post'])
-    def members(self, request, pk=None):
+    def members(self, request, pk=None):  # noqa: ARG002
         project = self.get_object()
         if request.method == 'GET':
             members = project.memberships.select_related('user').all()
@@ -61,7 +62,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['delete'], url_path='members/(?P<member_id>[^/.]+)')
-    def remove_member(self, request, pk=None, member_id=None):
+    def remove_member(self, request, pk=None, member_id=None):  # noqa: ARG002
         project = self.get_object()
         if not _is_owner(request, project):
             return Response(
@@ -73,7 +74,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=['get', 'post'], url_path='assign-repos')
-    def assign_repos(self, request, pk=None):
+    def assign_repos(self, request, pk=None):  # noqa: ARG002
         project = self.get_object()
         if request.method == 'GET':
             repos = project.assigned_repositories.all()

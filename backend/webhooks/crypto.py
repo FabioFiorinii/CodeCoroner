@@ -25,7 +25,7 @@ def decrypt_secret(value: str) -> str:
         return ''
     if value.startswith(PREFIX):
         try:
-            token = _fernet().decrypt(value[len(PREFIX):].encode('utf-8'))
+            token = _fernet().decrypt(value[len(PREFIX) :].encode('utf-8'))
         except InvalidToken:
             return ''
         return token.decode('utf-8')

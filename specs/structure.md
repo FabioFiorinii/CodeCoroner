@@ -6,15 +6,12 @@
 codecoroner/
 ├── backend/                  # Django backend
 ├── frontend/                 # React SPA
-├── ai-engine/                # AI agents (standalone service)
-├── sandbox/                  # Sandbox container configuration
-├── infra/                    # Infrastructure (nginx, scripts)
-├── specs/                    # Specification documents
-├── docs/                     # User documentation
-├── scripts/                  # Development scripts
-├── .github/                  # CI/CD workflows
+├── ai-engine/                # FastAPI agent server (plain HTTP, port 8002)
+├── sandbox/                  # Sandbox container stub (not yet wired)
+├── infra/                    # Infrastructure (nginx, postgres config)
+├── specs/                    # Specification documents (some drifted)
+├── scripts/                  # Development scripts (backup, restore, bootstrap)
 ├── podman-compose.yml        # Podman Compose (MVP)
-├── podman-compose.prod.yml   # Production overrides
 ├── Makefile                  # Common commands
 ├── .env.example              # Environment template
 ├── .gitignore
@@ -22,6 +19,8 @@ codecoroner/
 ├── README.md
 └── AGENTS.md                 # Agent instructions
 ```
+
+> **Note**: This document reflects the current structure as of 2026-08-18. Some specs/*.md files have drifted from the code — use for intent, trust the code.
 
 ## Backend (`backend/`)
 
@@ -77,13 +76,13 @@ backend/
 │   ├── urls.py               # /api/v1/repositories/
 │   ├── services.py           # GitService, RepositoryService
 │   ├── chunking.py           # SemanticChunker (tree-sitter)
-│   ├── indexing.py           # Indexing pipeline
+│   ├── tasks.py              # Celery tasks (clone, index, embeddings, daily_pulls)
 │   ├── admin.py
 │   └── tests/
 │       ├── test_models.py
 │       ├── test_services.py
 │       ├── test_chunking.py
-│       └── test_indexing.py
+│       └── test_views.py
 │
 ├── analyses/
 │   ├── __init__.py
@@ -94,26 +93,19 @@ backend/
 │   ├── views.py              # AnalysisViewSet
 │   ├── urls.py               # /api/v1/analyses/
 │   ├── orchestrator.py       # AnalysisOrchestrator (state machine)
-│   ├── services.py           # AnalysisService
-│   ├── admin.py
+│   ├── tasks.py              # Celery task: run_analysis_pipeline
 │   ├── consumers.py          # WebSocket consumer for status
 │   ├── routing.py            # WebSocket routing
 │   └── tests/
 │       ├── test_models.py
 │       ├── test_orchestrator.py
 │       ├── test_views.py
-│       └── test_pipeline.py
-│
-├── analyses/tasks/
-│   ├── __init__.py
-│   ├── index_tasks.py        # index_repository_task, generate_embeddings_task
-│   ├── analysis_tasks.py     # run_analysis_pipeline, bug_localization_task
-│   ├── patch_tasks.py        # generate_patch_task, validate_patch_task
-│   └── report_tasks.py       # generate_report_task
+│       ├── test_pipeline.py
+│       └── test_tenant_isolation.py
 │
 ├── reports/
 │   ├── __init__.py
-│   ├── models.py             # Extra report models if needed
+│   ├── serializers.py
 │   ├── services.py           # ReportService (Jinja2 rendering)
 │   ├── generators.py         # ReportGenerator (markdown templates)
 │   └── templates/
@@ -122,6 +114,7 @@ backend/
 ├── webhooks/
 │   ├── __init__.py
 │   ├── models.py             # Webhook
+│   ├── crypto.py             # Fernet encryption
 │   ├── services.py           # WebhookService (dispatch events)
 │   └── tasks.py              # dispatch_webhook_task
 │
@@ -130,17 +123,24 @@ backend/
 │   ├── models.py             # BaseModel (UUID, timestamps)
 │   ├── pagination.py         # Custom pagination
 │   ├── exceptions.py         # Custom exception handling
-│   ├── middleware.py         # Request logging, rate limiting
-│   └── utils.py              # Helpers
+│   ├── logging.py            # JSON formatter, handlers
+│   ├── cleanup.py            # Purge stale data (git GC, orphan dirs, retention)
+│   ├── tasks.py              # Celery tasks (purge, dlq_receiver)
+│   ├── celery.py             # DLQTask base class
+│   ├── management/
+│   │   └── commands/
+│   │       └── dlq.py        # DLQ management command
+│   └── tests/
+│       └── test_logging.py
 │
 ├── static/                   # Collected static files
-├── media/                    # User uploads
+├── media/                    # User uploads + repo cache (gitignored)
 ├── templates/                # Django templates (admin, base)
 │
 ├── manage.py
 ├── requirements.txt
 ├── requirements-dev.txt
-├── pyproject.toml            # Project metadata, ruff config
+├── pyproject.toml            # Project metadata, ruff, mypy config
 ├── Dockerfile
 └── .dockerignore
 ```
@@ -286,125 +286,63 @@ frontend/
 ai-engine/
 ├── agents/
 │   ├── __init__.py
-│   ├── base_agent.py         # Abstract base agent
-│   ├── agent_server.py       # Agent gRPC/HTTP server
+│   ├── agent_server.py       # FastAPI server (plain HTTP, port 8002)
 │   │
-│   ├── repository_indexer/
-│   │   ├── __init__.py
-│   │   ├── indexer.py        # RepositoryIndexer agent
-│   │   ├── chunker.py        # SemanticChunker (tree-sitter)
-│   │   └── languages.py      # Language definitions
-│   │
-│   ├── embedding_generator/
-│   │   ├── __init__.py
-│   │   ├── generator.py      # EmbeddingGenerator agent
-│   │   └── prefixes.py       # Type prefix strategy
-│   │
-│   ├── retrieval_engine/
-│   │   ├── __init__.py
-│   │   ├── engine.py         # HybridSearchEngine
-│   │   ├── reranker.py       # CrossEncoderReranker
-│   │   └── augmenter.py      # QueryAugmenter
-│   │
-│   ├── log_analyzer/
-│   │   ├── __init__.py
-│   │   ├── analyzer.py       # LogAnalyzer agent
-│   │   ├── stacktrace.py     # Stacktrace parser
-│   │   └── patterns.py       # Error patterns
-│   │
-│   ├── bug_localizer/
-│   │   ├── __init__.py
-│   │   ├── localizer.py      # BugLocalizer agent
-│   │   └── scorer.py         # File scoring algorithms
-│   │
-│   ├── root_cause/
-│   │   ├── __init__.py
-│   │   ├── rca_agent.py      # RootCauseAgent
-│   │   └── prompts.py        # RCA prompt templates
-│   │
-│   ├── patch_generator/
-│   │   ├── __init__.py
-│   │   ├── generator.py      # PatchGenerator agent
-│   │   └── prompts.py        # Patch prompt templates
-│   │
-│   ├── validation_agent/
-│   │   ├── __init__.py
-│   │   ├── validator.py      # ValidationAgent
-│   │   └── sandbox.py        # Podman sandbox controller
-│   │
-│   └── report_generator/
-│       ├── __init__.py
-│       ├── generator.py      # ReportGenerator agent
-│       └── templates/        # Report templates (.md.j2)
+│   ├── log_analyzer.py       # Analyze logs/stacktrace → structured queries
+│   ├── bug_localizer.py      # Hybrid search + scoring
+│   ├── root_cause.py         # RCA chain generation
+│   ├── patch_generator.py    # Diff + fix plan + explanation
+│   ├── report_generator.py   # Markdown report assembly
+│   └── validation_agent.py   # Stub (not wired in pipeline)
 │
 ├── core/
 │   ├── __init__.py
 │   ├── ollama_client.py      # Ollama async HTTP client
-│   ├── db.py                 # Database session (SQLAlchemy)
-│   ├── models.py             # Agent result models (Pydantic)
-│   └── config.py             # Agent settings (Pydantic)
+│   ├── models.py             # Pydantic models for requests/responses
+│   └── config.py             # Settings (Pydantic)
 │
 ├── tests/
-│   ├── test_indexer.py
-│   ├── test_chunker.py
-│   ├── test_embeddings.py
-│   ├── test_retrieval.py
 │   ├── test_log_analyzer.py
-│   ├── test_localizer.py
-│   ├── test_rca.py
-│   └── test_report.py
+│   ├── test_bug_localizer.py
+│   ├── test_root_cause.py
+│   ├── test_patch_generator.py
+│   └── test_report_generator.py
 │
 ├── requirements.txt
 ├── pyproject.toml
 ├── Dockerfile
-└── .dockerignore
+└ .dockerignore
 ```
+
+> **Note**: No gRPC — the Django backend calls ai-engine via plain HTTP (httpx) at `AI_ENGINE_URL` (default `http://ai-engine:8002`). Endpoints: `/embed`, `/index`, `/analyze-logs`, `/localize-bug`, `/analyze-root-cause`, `/suggest-fix`, `/generate-report`, `/health`.
 
 ## Sandbox (`sandbox/`)
 
 ```
 sandbox/
-├── Dockerfile                # Sandbox runtime image
-├── seccomp-default.json      # Seccomp profile
+├── Dockerfile                # Sandbox runtime image (stub)
 ├── scripts/
-│   ├── apply_patch.sh        # Apply patch in workspace
-│   ├── run_tests.sh          # Run pytest
-│   ├── run_lint.sh           # Run ruff
-│   └── run_typecheck.sh     # Run mypy
-└── podman-compose.yml        # Dynamic compose for sandbox
+│   └── validate.sh           # Placeholder
+└── podman-compose.yml        # Dynamic compose template (unused)
 ```
+
+> **Note**: The sandbox validation container exists as a stub but is **not wired into the pipeline**. The Validation Agent in ai-engine returns `not_implemented`. Deferred to future work.
 
 ## Infrastructure (`infra/`)
 
 ```
 infra/
 ├── nginx/
-│   ├── nginx.conf            # Reverse proxy config
-│   ├── ssl/
-│   │   ├── cert.pem          # SSL certificate
-│   │   └── key.pem           # SSL key
-│   └── locations/
-│       ├── api.conf          # /api/ → django
-│       ├── static.conf       # /static/ → django
-│       └── frontend.conf     # / → frontend
-│
+│   ├── nginx.conf            # Reverse proxy + TLS termination (:8443)
+│   └── entrypoint.sh         # Self-signed cert generation, HSTS opt-in
 ├── postgres/
-│   └── init.sql              # Extensions + initial schema
-│
-├── monitoring/
-│   ├── prometheus.yml
-│   └── grafana-dashboard.json
-│
-├── scripts/
-│   ├── bootstrap.sh          # First-time setup
-│   ├── backup.sh             # Database backup
-│   └── restore.sh            # Database restore
-│
-└── terraform/                # Future: infra as code
-    ├── main.tf
-    ├── variables.tf
-    └── outputs.tf
+│   └── init.sql              # Extensions (pgvector, pg_trgm) + init
+└── scripts/
+    ├── backup.sh             # pg_dump + repo volume backup
+    └── restore.sh            # Restore from backup
 ```
+
+> **Note**: No monitoring stack (Prometheus/Grafana) — observability is JSON logs only. TLS self-signed cert auto-generated on first nginx start into `nginx_certs` volume; HSTS opt-in via `ENABLE_HSTS=true`.
 
 ## Root files
 
@@ -415,7 +353,5 @@ Makefile
 README.md
 AGENTS.md                       # Instructions for AI coding agents
 podman-compose.yml              # MVP compose
-podman-compose.prod.yml         # Production overrides
 .python-version                 # 3.13
-.node-version                   # 22
 ```

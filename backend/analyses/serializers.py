@@ -215,7 +215,7 @@ class AnalysisCreateSerializer(serializers.ModelSerializer):
         repository = attrs.get('repository')
         if repository:
             repo_ids.add(repository.id)
-        for rid in (attrs.get('repository_ids') or []):
+        for rid in attrs.get('repository_ids') or []:
             repo_ids.add(rid)
         if repo_ids:
             repos = Repository.objects.filter(id__in=repo_ids)

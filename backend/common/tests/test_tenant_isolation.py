@@ -21,10 +21,14 @@ class TenantIsolationTests(TestCase):
         self.group_a = Group.objects.create(name='GroupA')
         self.group_b = Group.objects.create(name='GroupB')
         self.alice = User.objects.create_user(
-            email='alice@t.com', username='alice', password='pass12345',
+            email='alice@t.com',
+            username='alice',
+            password='pass12345',
         )
         self.bob = User.objects.create_user(
-            email='bob@t.com', username='bob', password='pass12345',
+            email='bob@t.com',
+            username='bob',
+            password='pass12345',
         )
         self.alice.groups.add(self.group_a)
         self.bob.groups.add(self.group_b)
@@ -32,12 +36,16 @@ class TenantIsolationTests(TestCase):
         self.proj_a = Project.objects.create(name='ProjA', created_by=self.alice)
         self.proj_a.groups.add(self.group_a)
         self.alice_membership = ProjectMembership.objects.create(
-            project=self.proj_a, user=self.alice, role=ProjectMembership.Role.OWNER,
+            project=self.proj_a,
+            user=self.alice,
+            role=ProjectMembership.Role.OWNER,
         )
         self.proj_b = Project.objects.create(name='ProjB', created_by=self.bob)
         self.proj_b.groups.add(self.group_b)
         ProjectMembership.objects.create(
-            project=self.proj_b, user=self.bob, role=ProjectMembership.Role.OWNER,
+            project=self.proj_b,
+            user=self.bob,
+            role=ProjectMembership.Role.OWNER,
         )
 
         self.repo_a = Repository.objects.create(
@@ -52,10 +60,16 @@ class TenantIsolationTests(TestCase):
         )
 
         self.analysis_a = Analysis.objects.create(
-            user=self.alice, project=self.proj_a, repository=self.repo_a, title='A bug',
+            user=self.alice,
+            project=self.proj_a,
+            repository=self.repo_a,
+            title='A bug',
         )
         self.analysis_b = Analysis.objects.create(
-            user=self.bob, project=self.proj_b, repository=self.repo_b, title='B bug',
+            user=self.bob,
+            project=self.proj_b,
+            repository=self.repo_b,
+            title='B bug',
         )
 
     def _analysis_url(self, analysis_id, suffix=''):
@@ -71,7 +85,9 @@ class TenantIsolationTests(TestCase):
     def test_2_cross_tenant_analysis_patch_returns_404(self):
         self.client.force_authenticate(user=self.bob)
         response = self.client.patch(
-            self._analysis_url(self.analysis_a.id), {'title': 'hacked'}, format='json',
+            self._analysis_url(self.analysis_a.id),
+            {'title': 'hacked'},
+            format='json',
         )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.analysis_a.refresh_from_db()
@@ -112,41 +128,54 @@ class TenantIsolationTests(TestCase):
     @patch('analyses.tasks.run_analysis_pipeline.delay')
     def test_6_cross_tenant_create_analysis_blocked(self, mock_pipeline):
         self.client.force_authenticate(user=self.bob)
-        response = self.client.post('/api/v1/analyses/', {
-            'project': str(self.proj_a.id),
-            'repository': str(self.repo_a.id),
-            'title': 'stolen',
-            'error_context': {'error_message': 'boom'},
-        }, format='json')
+        response = self.client.post(
+            '/api/v1/analyses/',
+            {
+                'project': str(self.proj_a.id),
+                'repository': str(self.repo_a.id),
+                'title': 'stolen',
+                'error_context': {'error_message': 'boom'},
+            },
+            format='json',
+        )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         mock_pipeline.assert_not_called()
         self.assertFalse(
             Analysis.objects.filter(
-                project=self.proj_a, title='stolen',
+                project=self.proj_a,
+                title='stolen',
             ).exists()
         )
 
     @patch('analyses.tasks.run_analysis_pipeline.delay')
     def test_7_cross_tenant_repo_in_own_project_blocked(self, mock_pipeline):
         self.client.force_authenticate(user=self.alice)
-        response = self.client.post('/api/v1/analyses/', {
-            'project': str(self.proj_a.id),
-            'repository': str(self.repo_b.id),
-            'title': 'foreign-repo',
-            'error_context': {'error_message': 'boom'},
-        }, format='json')
+        response = self.client.post(
+            '/api/v1/analyses/',
+            {
+                'project': str(self.proj_a.id),
+                'repository': str(self.repo_b.id),
+                'title': 'foreign-repo',
+                'error_context': {'error_message': 'boom'},
+            },
+            format='json',
+        )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         mock_pipeline.assert_not_called()
 
     @patch('analyses.tasks.run_analysis_pipeline.delay')
     def test_8_owner_create_analysis_in_own_project_allowed(self, mock_pipeline):
         self.client.force_authenticate(user=self.alice)
-        response = self.client.post('/api/v1/analyses/', {
-            'project': str(self.proj_a.id),
-            'repository': str(self.repo_a.id),
-            'title': 'mine',
-            'error_context': {'error_message': 'boom'},
-        }, format='json')
+        response = self.client.post(
+            '/api/v1/analyses/',
+            {
+                'project': str(self.proj_a.id),
+                'repository': str(self.repo_a.id),
+                'title': 'mine',
+                'error_context': {'error_message': 'boom'},
+            },
+            format='json',
+        )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         mock_pipeline.assert_called_once()
 
@@ -154,10 +183,14 @@ class TenantIsolationTests(TestCase):
 
     def test_9_member_cannot_add_owner(self):
         carol = User.objects.create_user(
-            email='carol@t.com', username='carol', password='pass12345',
+            email='carol@t.com',
+            username='carol',
+            password='pass12345',
         )
         ProjectMembership.objects.create(
-            project=self.proj_a, user=carol, role=ProjectMembership.Role.MEMBER,
+            project=self.proj_a,
+            user=carol,
+            role=ProjectMembership.Role.MEMBER,
         )
         self.client.force_authenticate(user=carol)
         response = self.client.post(
@@ -172,26 +205,32 @@ class TenantIsolationTests(TestCase):
 
     def test_10_member_cannot_remove_owner(self):
         carol = User.objects.create_user(
-            email='carol@t.com', username='carol', password='pass12345',
+            email='carol@t.com',
+            username='carol',
+            password='pass12345',
         )
         ProjectMembership.objects.create(
-            project=self.proj_a, user=carol, role=ProjectMembership.Role.MEMBER,
+            project=self.proj_a,
+            user=carol,
+            role=ProjectMembership.Role.MEMBER,
         )
         self.client.force_authenticate(user=carol)
         response = self.client.delete(
             f'/api/v1/projects/{self.proj_a.id}/members/{self.alice_membership.id}/'
         )
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertTrue(
-            ProjectMembership.objects.filter(id=self.alice_membership.id).exists()
-        )
+        self.assertTrue(ProjectMembership.objects.filter(id=self.alice_membership.id).exists())
 
     def test_11_member_cannot_assign_repos(self):
         carol = User.objects.create_user(
-            email='carol@t.com', username='carol', password='pass12345',
+            email='carol@t.com',
+            username='carol',
+            password='pass12345',
         )
         ProjectMembership.objects.create(
-            project=self.proj_a, user=carol, role=ProjectMembership.Role.MEMBER,
+            project=self.proj_a,
+            user=carol,
+            role=ProjectMembership.Role.MEMBER,
         )
         self.client.force_authenticate(user=carol)
         response = self.client.post(
@@ -209,9 +248,7 @@ class TenantIsolationTests(TestCase):
             format='json',
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertFalse(
-            Repository.objects.get(id=self.repo_b.id).project_id == self.proj_a.id
-        )
+        self.assertFalse(Repository.objects.get(id=self.repo_b.id).project_id == self.proj_a.id)
         self.assertFalse(self.proj_a.assigned_repositories.filter(id=self.repo_b.id).exists())
 
     def test_13_owner_can_assign_own_repo(self):
@@ -241,7 +278,9 @@ class TenantIsolationTests(TestCase):
             secret='supersecret',
         )
         admin = User.objects.create_superuser(
-            email='admin@t.com', username='admin', password='pass12345',
+            email='admin@t.com',
+            username='admin',
+            password='pass12345',
         )
         self.client.force_authenticate(user=admin)
         response = self.client.get('/api/v1/webhooks/')
