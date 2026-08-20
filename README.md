@@ -430,8 +430,11 @@ WebSocket: `wss://localhost:8443/ws/analyses/{id}/` (real-time status; stage com
 - **Staging & zero-downtime** — staging env, rolling deploys, versioning (single-host for now)
 - **CI/CD** — GitHub Actions (no paid GitHub); reproducibility is manual via `make build`
 - **Dependency scanning** — Dependabot/renovate for dependency vulnerabilities
-- **GPU acceleration** — Ollama on CUDA/ROCm with a model-tier toggle in admin (see `specs/ai-architecture.md`)
-- **GDPR** — export/cancellation endpoints, access-log retention, DPIA/registry for public multi-tenant (see "Sviluppi futuri")
+- **GPU acceleration** — Ollama on CUDA/ROCm/Metal to cut inference latency and cost:
+  - **How**: Ollama selects the backend (CUDA/ROCm/Metal) at boot; `OLLAMA_GPU_LAYERS` controls how many layers go to the GPU; Podman must pass the GPU device (`--gpus=all` / device cgroup) or the container can't see it.
+  - **WSL2 prerequisites**: recent NVIDIA driver on Windows + `nvidia-container-toolkit` inside the WSL distro (needs the CDI/GPU hook for Podman; without it `/dev/dxg` isn't injected into the container).
+  - **Project changes** (small, when hardware is available): add the GPU flag + `OLLAMA_GPU_LAYERS` to the `ollama` service in `podman-compose.yml`; propagate `OLLAMA_GPU_LAYERS` from `.env`; expose a `PlatformSetting` toggle (GPU on/off + model tier `fast/balanced/precise`) in admin; document requirements.
+  - **Expectation**: `nomic-embed-text` and the 3b/7b tiers run fine on 8–16 GB VRAM; the 14b tier needs ≥8 GB with quantization. Currently CPU-only, no GPU exposed to WSL2.
 
 ## Production Readiness
 
