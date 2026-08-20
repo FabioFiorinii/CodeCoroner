@@ -438,19 +438,24 @@ WebSocket: `wss://localhost:8443/ws/analyses/{id}/` (real-time status; stage com
 
 ## Production Readiness
 
-The codebase runs the full stack locally on Podman, but several **production gaps remain** before a public deployment. High-priority items:
+The stack runs fully on Podman. The following hardening is **already in place**:
 
-- **TLS**: nginx terminates TLS on **:8443** with an auto-generated self-signed cert and redirects HTTP→HTTPS; **security headers are in place** (X-Frame-Options, nosniff, Referrer-Policy, CSP) and **HSTS is available** via `ENABLE_HSTS=true`. For prod: mount real certs in `infra/nginx/certs/` (or `nginx_certs` volume), map 443, set `ENABLE_HSTS=true`, and update the redirect port in `nginx.conf`.
-- **Secrets**: with `config.settings.prod` the app **fails fast** if `DJANGO_SECRET_KEY`/`DB_PASSWORD` are missing or still set to the dev defaults; `.env` is gitignored; **webhook secrets are encrypted at rest** (Fernet, key from `WEBHOOK_SECRET_KEY` env, falling back to `DJANGO_SECRET_KEY`).
-- **Migrations**: applied explicitly via `make migrate` (no `makemigrations`/`migrate`/`seed_base` at container start anymore); the container starts `runserver` directly.
-- **Build reproducibility**: no CI — rebuild with `make build` after Dockerfile/requirements changes. Note that `podman-compose up -d` can silently reuse **stale images** (`backend/.dockerignore` was previously excluding `requirements-dev.txt`, breaking `make build`; fixed). The Dockerfile collects static with dev settings (prod settings fail fast on secrets, which would break the build step).
-- **Backup & DR**: `make backup` dumps Postgres (`pg_dump -Fc`) and the repo volume into `backups/`, `make restore` recreates them — see `scripts/backup-restore.md`. Not yet tested on a fresh machine / offsite storage.
-- **Observability**: structured **JSON logs** (stdout + daily-rotating file in prod). Still no Sentry, Prometheus or Celery failure alerting.
-- **Queue hardening**: `acks_late` + `reject_on_worker_lost` (tasks are redelivered if a worker dies mid-run), a dedicated `llm` queue so long analyses don't block short tasks, and a **dead-letter queue** (`celery_dlq` in Redis, drained via `manage.py dlq`). Beat schedules the **weekly stale-data purge** (git GC, orphan repo dirs, analysis retention) plus daily auto-pull.
-- **Data lifecycle**: periodic purge removes old analyses and orphaned repo dirs; `git gc` keeps clones small; embeddings have a pgvector **HNSW** index. Backups do not yet prune old dumps automatically beyond retention.
-- **Login hardening**: django-axes enforces a per-account lockout (5 attempts → 1h cooldown, configurable). Cooldown intentionally does not count IPs (shared office/NAT would trigger false positives).
-- **Input limits**: ai-engine rejects payloads over 200k chars on the analysis endpoints (400) — bounds prompt-injection surface and runaway costs.
-- **Multi-tenant**: analyses/projects/repos/webhooks are scoped per project membership + groups; cross-tenant reads/mutations return 404/403, membership management and repo assignment are owner-only, and webhook endpoints are superuser-only. Covered by `common/tests/test_tenant_isolation.py`.
+- **TLS/HTTPS** — nginx terminates TLS on **:8443** (self-signed cert auto-generated on first start), HTTP→HTTPS redirect, security headers + CSP, HSTS opt-in via `ENABLE_HSTS`, proxy-header trust + `CSRF_TRUSTED_ORIGINS` for prod (`config.settings.prod`)
+- **Secrets** — `config.settings.prod` **fails fast** if `DJANGO_SECRET_KEY`/`DB_PASSWORD` are missing or still set to dev defaults; `.env` is gitignored; **webhook secrets encrypted at rest** (Fernet)
+- **Migrations** — applied explicitly via `make migrate` (no auto-`migrate`/`seed` at container start)
+- **Queue hardening** — `acks_late` + `reject_on_worker_lost`, dedicated `llm` queue so long analyses don't block short tasks, **dead-letter queue** (`celery_dlq` in Redis, drained via `manage.py dlq list|replay|purge`); beat schedules the weekly stale-data purge + daily auto-pull
+- **Data lifecycle** — periodic purge (git GC, orphan repo dirs, 90d analysis retention), pgvector **HNSW** index on embeddings; `backup.sh` auto-prunes dumps older than `RETENTION_DAYS` (default 7)
+- **Login hardening** — django-axes per-account lockout (5 attempts → 1h cooldown, configurable); cooldown deliberately does not count IPs (shared office/NAT would cause false positives)
+- **Input limits** — ai-engine rejects payloads over 200k chars on the analysis endpoints (400) — bounds prompt-injection surface and runaway costs
+- **Multi-tenant isolation** — analyses/projects/repos/webhooks scoped per project membership + groups; cross-tenant reads/mutations return 404/403; membership and repo assignment owner-only; webhook endpoints superuser-only. Covered by `common/tests/test_tenant_isolation.py`
+- **Backup & DR** — `make backup` (pg_dump `-Fc` + repo volume) / `make restore`; **restore validated end-to-end on a fresh machine (2026-08-19, WSL2 from scratch)** including data, vector search, repo cache and login — see `scripts/backup-restore.md`
+
+**Remaining gaps before a public deployment** (the rest is tracked under "Sviluppi futuri"):
+
+- **Real TLS certificates** — currently self-signed; for prod mount real certs, map 443, set `ENABLE_HSTS=true`
+- **Offsite backups** — DR restore is proven, but `backups/` still lives on the same host; copy it off-machine (external disk / rsync target) for real DR
+- **Observability** — structured **JSON logs** (stdout + daily rotation) only; no Sentry/Prometheus/Celery-failure alerting yet
+- **CI/CD** — no GitHub Actions; rebuild with `make build` after Dockerfile/requirements changes (`podman-compose up -d` can reuse stale images)
 
 See `specs/*.md` for design intent — some files have drifted from the current code (trust the code).
 
