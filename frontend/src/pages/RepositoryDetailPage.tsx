@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Globe, GitBranch, FileCode, RefreshCw, Play,
@@ -40,7 +39,6 @@ export function RepositoryDetailPage() {
   const updateRepo = useUpdateRepository(repoId)
   const { data: filesData } = useRepositoryFiles(repoId)
   const { data: chunksData } = useRepositoryChunks(repoId)
-  const [showChunks, setShowChunks] = useState(false)
 
   const handleDelete = async () => {
     const ok = await confirmDialog({
@@ -191,7 +189,7 @@ export function RepositoryDetailPage() {
       <Card padding="lg">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold text-text-primary">Indexed Files</h3>
-          <span className="text-sm text-text-muted">{filesData?.results?.length ?? 0} files</span>
+          <span className="text-sm text-text-muted">{repo.file_count ?? 0} files</span>
         </div>
         {!filesData?.results?.length ? (
           <p className="text-sm text-text-muted">No files indexed yet. Run indexing to populate.</p>
@@ -209,14 +207,11 @@ export function RepositoryDetailPage() {
       </Card>
 
       <Card padding="lg">
-        <button
-          onClick={() => setShowChunks(!showChunks)}
-          className="flex items-center justify-between w-full"
-        >
+        <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold text-text-primary">Code Chunks</h3>
-          <span className="text-sm text-text-muted">{chunksData?.results?.length ?? 0} chunks</span>
-        </button>
-        {showChunks && chunksData?.results?.length ? (
+          <span className="text-sm text-text-muted">{repo.chunk_count ?? 0} chunks</span>
+        </div>
+        {chunksData?.results?.length ? (
           <div className="space-y-2 mt-4 max-h-80 overflow-y-auto">
             {chunksData.results.map((c) => (
               <div key={c.id} className="text-sm border rounded p-2">
@@ -233,9 +228,9 @@ export function RepositoryDetailPage() {
               </div>
             ))}
           </div>
-        ) : showChunks ? (
+        ) : (
           <p className="text-sm text-text-muted mt-4">No chunks found.</p>
-        ) : null}
+        )}
       </Card>
     </div>
   )

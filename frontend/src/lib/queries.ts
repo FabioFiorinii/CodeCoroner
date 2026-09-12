@@ -70,6 +70,7 @@ export interface RepositoryItem {
   auto_pull: boolean
   status: 'pending' | 'cloning' | 'indexing' | 'indexed' | 'error'
   file_count: number
+  chunk_count: number
   total_bytes: number
   error_message: string
   last_indexed_at: string | null
@@ -87,6 +88,7 @@ export interface RepositoryStatus {
   id: string
   status: string
   file_count: number
+  chunk_count: number
   total_bytes: number
   last_indexed_at: string | null
   error_message: string | null

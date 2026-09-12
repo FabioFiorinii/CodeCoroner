@@ -91,11 +91,11 @@ class PatchGenerator(BaseAgent):
         ], indent=2)
 
         prompt = SUGGEST_FIX_PROMPT.format(
-            error_context=json.dumps(error_context, indent=2),
-            repo_profile=repo_profile or '(no repo profile available)',
-            log_analysis=json.dumps(log_analysis, indent=2),
-            bug_localization=json.dumps(bug_localization, indent=2),
-            root_cause=json.dumps(root_cause, indent=2),
+            error_context=json.dumps(error_context, indent=2, default=str),
+            repo_profile=json.dumps(repo_profile, indent=2, default=str),
+            log_analysis=json.dumps(log_analysis, indent=2, default=str),
+            bug_localization=json.dumps(bug_localization, indent=2, default=str),
+            root_cause=json.dumps(root_cause, indent=2, default=str),
             source_code=source_code,
         )
         try:

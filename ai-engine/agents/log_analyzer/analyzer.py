@@ -48,7 +48,7 @@ class LogAnalyzer(BaseAgent):
     async def run(self, error_context: dict, repo_profile: str = '') -> dict:
         prompt = ANALYZE_PROMPT.format(
             repo_profile=repo_profile or '(no repo profile available)',
-            error_context=json.dumps(error_context, indent=2),
+            error_context=json.dumps(error_context, indent=2, default=str),
         )
         try:
             raw = await self.ollama.generate(

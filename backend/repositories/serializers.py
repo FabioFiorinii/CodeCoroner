@@ -48,9 +48,10 @@ class RepositorySerializer(serializers.ModelSerializer):
     )
     groups = serializers.SlugRelatedField(
         many=True,
-        slug_field='name',
         read_only=True,
+        slug_field='name',
     )
+    chunk_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Repository
@@ -61,6 +62,7 @@ class RepositorySerializer(serializers.ModelSerializer):
             'auto_pull',
             'status',
             'file_count',
+            'chunk_count',
             'total_bytes',
             'error_message',
             'last_indexed_at',

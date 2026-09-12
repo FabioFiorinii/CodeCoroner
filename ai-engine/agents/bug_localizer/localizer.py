@@ -77,8 +77,8 @@ class BugLocalizer(BaseAgent):
         )
 
         prompt = LOCALIZE_PROMPT.format(
-            log_analysis=json.dumps(log_analysis, indent=2),
-            error_context=json.dumps(error_context, indent=2),
+            log_analysis=json.dumps(log_analysis, indent=2, default=str),
+            error_context=json.dumps(error_context, indent=2, default=str),
             repo_profile=repo_profile or '(no repo profile available)',
             candidate_list=candidate_list,
         )

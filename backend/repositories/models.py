@@ -46,6 +46,10 @@ class Repository(models.Model):
     def __str__(self):
         return f'{self.git_url} ({self.status})'
 
+    @property
+    def chunk_count(self) -> int:
+        return CodeChunk.objects.filter(file__repository=self).count()
+
 
 class IndexedFile(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

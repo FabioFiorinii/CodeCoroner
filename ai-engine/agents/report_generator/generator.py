@@ -62,7 +62,7 @@ class ReportGenerator(BaseAgent):
     async def run(self, analysis_data: dict, repo_profile: str = '') -> dict:
         prompt = REPORT_PROMPT.format(
             repo_profile=repo_profile or '(no repo profile available)',
-            analysis_data=json.dumps(analysis_data, indent=2),
+            analysis_data=json.dumps(analysis_data, indent=2, default=str),
         )
         try:
             raw = await self.ollama.generate(

@@ -71,10 +71,10 @@ class RootCauseAgent(BaseAgent):
             candidate_list = '(no source candidates available; rely on the stacktrace in Error Context)'
 
         prompt = RCA_PROMPT.format(
-            error_context=json.dumps(error_context, indent=2),
-            log_analysis=json.dumps(log_analysis, indent=2),
+            error_context=json.dumps(error_context, indent=2, default=str),
+            log_analysis=json.dumps(log_analysis, indent=2, default=str),
             repo_profile=repo_profile or '(no repo profile available)',
-            suspicious_files=json.dumps(suspicious_files, indent=2),
+            suspicious_files=json.dumps(suspicious_files, indent=2, default=str),
             candidate_list=candidate_list,
         )
         try:
