@@ -2,6 +2,7 @@ import uuid
 
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 
 class Analysis(models.Model):
@@ -94,6 +95,13 @@ class BugLocalization(models.Model):
     )
     summary = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
+    # AI Act Art. 50(2) marking
+    ai_generated = models.BooleanField(default=True)
+    model_name = models.CharField(max_length=100, blank=True)
+    model_version = models.CharField(max_length=100, blank=True)
+    generated_at = models.DateTimeField(default=timezone.now)
+    prompt_hash = models.CharField(max_length=64, blank=True)
+    watermark = models.TextField(blank=True, null=True)
 
 
 class SuspiciousFileScore(models.Model):
@@ -123,6 +131,13 @@ class RootCause(models.Model):
     confidence = models.FloatField(default=0.0)
     reasoning = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
+    # AI Act Art. 50(2) marking
+    ai_generated = models.BooleanField(default=True)
+    model_name = models.CharField(max_length=100, blank=True)
+    model_version = models.CharField(max_length=100, blank=True)
+    generated_at = models.DateTimeField(default=timezone.now)
+    prompt_hash = models.CharField(max_length=64, blank=True)
+    watermark = models.TextField(blank=True, null=True)
 
 
 class Patch(models.Model):
@@ -164,6 +179,13 @@ class FixSuggestion(models.Model):
     plan = models.TextField(blank=True, default='')
     explanation = models.TextField(blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
+    # AI Act Art. 50(2) marking
+    ai_generated = models.BooleanField(default=True)
+    model_name = models.CharField(max_length=100, blank=True)
+    model_version = models.CharField(max_length=100, blank=True)
+    generated_at = models.DateTimeField(default=timezone.now)
+    prompt_hash = models.CharField(max_length=64, blank=True)
+    watermark = models.TextField(blank=True, null=True)
 
     def __str__(self):
         return f'FixSuggestion for {self.analysis.id.hex[:8]}'
@@ -180,3 +202,10 @@ class Report(models.Model):
     markdown = models.TextField()
     format = models.CharField(max_length=10, choices=Format.choices, default=Format.MARKDOWN)
     created_at = models.DateTimeField(auto_now_add=True)
+    # AI Act Art. 50(2) marking
+    ai_generated = models.BooleanField(default=True)
+    model_name = models.CharField(max_length=100, blank=True)
+    model_version = models.CharField(max_length=100, blank=True)
+    generated_at = models.DateTimeField(default=timezone.now)
+    prompt_hash = models.CharField(max_length=64, blank=True)
+    watermark = models.TextField(blank=True, null=True)

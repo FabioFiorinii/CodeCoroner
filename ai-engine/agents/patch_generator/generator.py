@@ -1,5 +1,7 @@
+import hashlib
 import json
 import logging
+from datetime import datetime
 from agents.base_agent import BaseAgent
 from agents.json_utils import parse_json_response
 
@@ -45,11 +47,22 @@ Relevant Source Code Chunks:
 {source_code}
 
 Your task: analyze the bug and propose a fix. Return ONLY valid JSON with this exact structure:
-{{
+{
   "diff": "string - a unified diff (--- a/... +++ b/...) of the proposed changes to fix the bug",
   "plan": "string - a concise, step-by-step plan for implementing the fix, written as a prompt for another AI. Minimize token usage: be direct, specific, and avoid any explanatory text. Only include: file path, line ranges to modify, what to change and what to replace it with.",
   "explanation": "string - detailed explanation of why this fix is needed: what causes the bug, what the change does, what side effects it might have, and why this approach was chosen over alternatives."
-}}"""
+}"""
+
+
+def _build_ai_marking(model_name: str, prompt: str) -> dict:
+    return {
+        'ai_generated': True,
+        'model_name': model_name,
+        'model_version': model_name.split(':')[-1] if ':' in model_name else '',
+        'generated_at': datetime.utcnow().isoformat() + 'Z',
+        'prompt_hash': hashlib.sha256(prompt.encode()).hexdigest(),
+        'watermark': None,
+    }
 
 
 class PatchGenerator(BaseAgent):
@@ -94,6 +107,8 @@ class PatchGenerator(BaseAgent):
             result.setdefault('diff', '')
             result.setdefault('plan', '')
             result.setdefault('explanation', '')
+            marking = _build_ai_marking(self.settings.rca_model, prompt)
+            result.update(marking)
             return result
         except Exception as exc:
             logger.error('PatchGenerator failed: %s', exc)

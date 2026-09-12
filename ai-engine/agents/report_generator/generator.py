@@ -1,5 +1,7 @@
+import hashlib
 import json
 import logging
+from datetime import datetime
 from agents.base_agent import BaseAgent
 from agents.json_utils import parse_json_response
 
@@ -39,10 +41,21 @@ Rules:
 - Be direct; skip filler.
 
 Return ONLY valid JSON with this structure:
-{{
+{
   "title": "string - short report title",
   "markdown": "string - the full Markdown report"
-}}"""
+}"""
+
+
+def _build_ai_marking(model_name: str, prompt: str) -> dict:
+    return {
+        'ai_generated': True,
+        'model_name': model_name,
+        'model_version': model_name.split(':')[-1] if ':' in model_name else '',
+        'generated_at': datetime.utcnow().isoformat() + 'Z',
+        'prompt_hash': hashlib.sha256(prompt.encode()).hexdigest(),
+        'watermark': None,
+    }
 
 
 class ReportGenerator(BaseAgent):
@@ -59,6 +72,8 @@ class ReportGenerator(BaseAgent):
             result.setdefault('status', 'ok')
             if not result.get('markdown'):
                 result['markdown'] = f"# Bug Analysis Report\n\n{raw}"
+            marking = _build_ai_marking(self.settings.llm_model, prompt)
+            result.update(marking)
             return result
         except Exception as exc:
             logger.error('ReportGenerator failed: %s', exc)

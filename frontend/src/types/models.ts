@@ -88,6 +88,12 @@ export interface BugLocalization {
   summary: string
   suspicious_files: SuspiciousFile[]
   created_at: string
+  ai_generated?: boolean
+  model_name?: string
+  model_version?: string
+  generated_at?: string
+  prompt_hash?: string
+  watermark?: string | null
 }
 
 export interface SuspiciousFile {
@@ -106,6 +112,12 @@ export interface RootCause {
   confidence: number
   reasoning: string
   created_at: string
+  ai_generated?: boolean
+  model_name?: string
+  model_version?: string
+  generated_at?: string
+  prompt_hash?: string
+  watermark?: string | null
 }
 
 export interface Patch {
@@ -133,10 +145,22 @@ export interface FixSuggestion {
   plan: string
   explanation: string
   created_at: string
+  ai_generated?: boolean
+  model_name?: string
+  model_version?: string
+  generated_at?: string
+  prompt_hash?: string
+  watermark?: string | null
 }
 
 export interface ReportData {
   markdown: string
   format: 'markdown' | 'pdf' | 'html'
   created_at: string
+  ai_generated?: boolean
+  model_name?: string
+  model_version?: string
+  generated_at?: string
+  prompt_hash?: string
+  watermark?: string | null
 }

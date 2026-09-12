@@ -273,6 +273,12 @@ export interface AnalysisItem {
       rank: number
     }>
     created_at: string
+    ai_generated?: boolean
+    model_name?: string
+    model_version?: string
+    generated_at?: string
+    prompt_hash?: string
+    watermark?: string | null
   } | null
   root_cause: {
     summary: string
@@ -282,17 +288,35 @@ export interface AnalysisItem {
     confidence: number
     reasoning: string
     created_at: string
+    ai_generated?: boolean
+    model_name?: string
+    model_version?: string
+    generated_at?: string
+    prompt_hash?: string
+    watermark?: string | null
   } | null
   fix_suggestion: {
     diff: string
     plan: string
     explanation: string
     created_at: string
+    ai_generated?: boolean
+    model_name?: string
+    model_version?: string
+    generated_at?: string
+    prompt_hash?: string
+    watermark?: string | null
   } | null
   report: {
     markdown: string
     format: string
     created_at: string
+    ai_generated?: boolean
+    model_name?: string
+    model_version?: string
+    generated_at?: string
+    prompt_hash?: string
+    watermark?: string | null
   } | null
   latest_status: string
   latest_error_message: string

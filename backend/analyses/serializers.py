@@ -33,7 +33,17 @@ class BugLocalizationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = BugLocalization
-        fields = ['summary', 'suspicious_files', 'created_at']
+        fields = [
+            'summary',
+            'suspicious_files',
+            'created_at',
+            'ai_generated',
+            'model_name',
+            'model_version',
+            'generated_at',
+            'prompt_hash',
+            'watermark',
+        ]
 
 
 class RootCauseSerializer(serializers.ModelSerializer):
@@ -47,6 +57,12 @@ class RootCauseSerializer(serializers.ModelSerializer):
             'confidence',
             'reasoning',
             'created_at',
+            'ai_generated',
+            'model_name',
+            'model_version',
+            'generated_at',
+            'prompt_hash',
+            'watermark',
         ]
 
 
@@ -75,13 +91,34 @@ class PatchValidationSerializer(serializers.ModelSerializer):
 class FixSuggestionSerializer(serializers.ModelSerializer):
     class Meta:
         model = FixSuggestion
-        fields = ['diff', 'plan', 'explanation', 'created_at']
+        fields = [
+            'diff',
+            'plan',
+            'explanation',
+            'created_at',
+            'ai_generated',
+            'model_name',
+            'model_version',
+            'generated_at',
+            'prompt_hash',
+            'watermark',
+        ]
 
 
 class ReportSerializer(serializers.ModelSerializer):
     class Meta:
         model = Report
-        fields = ['markdown', 'format', 'created_at']
+        fields = [
+            'markdown',
+            'format',
+            'created_at',
+            'ai_generated',
+            'model_name',
+            'model_version',
+            'generated_at',
+            'prompt_hash',
+            'watermark',
+        ]
 
 
 class AnalysisRunSerializer(serializers.ModelSerializer):

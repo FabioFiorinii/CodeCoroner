@@ -15,6 +15,7 @@ import { useAuthStore } from '../stores/authStore'
 import { useAnalysisWatch } from '../lib/analysisWatch'
 import { Card } from '../components/common/Card'
 import { Button } from '../components/common/Button'
+import { AIBadge } from '../components/common/AIBadge'
 
 const STATUS_ICON: Record<string, typeof Clock> = {
   queued: Clock,
@@ -353,10 +354,18 @@ export function AnalysisDetailPage() {
 
       {analysis.bug_localization && (
         <Card padding="lg">
-          <h3 className="font-semibold text-text-primary flex items-center gap-2 mb-4">
-            <Target className="w-4 h-4" />
-            Bug Localization
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-text-primary flex items-center gap-2">
+              <Target className="w-4 h-4" />
+              Bug Localization
+            </h3>
+            <AIBadge
+              aiGenerated={analysis.bug_localization.ai_generated}
+              modelName={analysis.bug_localization.model_name}
+              modelVersion={analysis.bug_localization.model_version}
+              generatedAt={analysis.bug_localization.generated_at}
+            />
+          </div>
           <p className="text-sm text-text-secondary mb-4">{analysis.bug_localization.summary}</p>
           <div className="space-y-2">
             {analysis.bug_localization.suspicious_files?.map((f) => (
@@ -387,10 +396,18 @@ export function AnalysisDetailPage() {
 
       {analysis.root_cause && (
         <Card padding="lg">
-          <h3 className="font-semibold text-text-primary flex items-center gap-2 mb-4">
-            <FileSearch className="w-4 h-4" />
-            Root Cause Analysis
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-text-primary flex items-center gap-2">
+              <FileSearch className="w-4 h-4" />
+              Root Cause Analysis
+            </h3>
+            <AIBadge
+              aiGenerated={analysis.root_cause.ai_generated}
+              modelName={analysis.root_cause.model_name}
+              modelVersion={analysis.root_cause.model_version}
+              generatedAt={analysis.root_cause.generated_at}
+            />
+          </div>
           <p className="font-medium text-text-primary mb-2">{analysis.root_cause.summary}</p>
           {analysis.root_cause.root_file && (
             <div className="flex items-center gap-2 text-sm text-text-secondary mb-3">
@@ -432,10 +449,18 @@ export function AnalysisDetailPage() {
 
       {analysis.fix_suggestion && (
         <Card padding="lg">
-          <h3 className="font-semibold text-text-primary flex items-center gap-2 mb-4">
-            <Wrench className="w-4 h-4" />
-            Fix Suggestion
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-text-primary flex items-center gap-2">
+              <Wrench className="w-4 h-4" />
+              Fix Suggestion
+            </h3>
+            <AIBadge
+              aiGenerated={analysis.fix_suggestion.ai_generated}
+              modelName={analysis.fix_suggestion.model_name}
+              modelVersion={analysis.fix_suggestion.model_version}
+              generatedAt={analysis.fix_suggestion.generated_at}
+            />
+          </div>
 
           {analysis.fix_suggestion.diff && (
             <div className="mb-4">
@@ -468,10 +493,18 @@ export function AnalysisDetailPage() {
 
       {analysis.report && (
         <Card padding="lg">
-          <h3 className="font-semibold text-text-primary flex items-center gap-2 mb-4">
-            <BookOpen className="w-4 h-4" />
-            Report
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-text-primary flex items-center gap-2">
+              <BookOpen className="w-4 h-4" />
+              Report
+            </h3>
+            <AIBadge
+              aiGenerated={analysis.report.ai_generated}
+              modelName={analysis.report.model_name}
+              modelVersion={analysis.report.model_version}
+              generatedAt={analysis.report.generated_at}
+            />
+          </div>
           <div className="prose prose-sm max-w-none text-text-secondary">
             {analysis.report.markdown.split('\n').map((line, i) => {
               if (line.startsWith('### ')) return <h4 key={i} className="text-text-primary font-semibold mt-4 mb-2">{line.slice(4)}</h4>

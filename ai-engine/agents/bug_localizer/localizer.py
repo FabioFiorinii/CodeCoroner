@@ -1,6 +1,8 @@
+import hashlib
 import json
 import logging
 import re
+from datetime import datetime
 from agents.base_agent import BaseAgent
 from agents.json_utils import parse_json_response
 
@@ -31,17 +33,28 @@ Instructions:
 4. "file_path" MUST be an exact string from the candidate list above. NEVER invent a path.
 
 Return ONLY valid JSON with this exact structure:
-{{
+{
   "summary": "string - brief summary, at most 2 sentences",
   "suspicious_files": [
-    {{
+    {
       "file_path": "string - EXACT path from the candidate list",
       "score": 0.0-1.0,
       "evidence": "string - why this file is suspicious",
       "rank": 1
-    }}
+    }
   ]
-}}"""
+}"""
+
+
+def _build_ai_marking(model_name: str, prompt: str) -> dict:
+    return {
+        'ai_generated': True,
+        'model_name': model_name,
+        'model_version': model_name.split(':')[-1] if ':' in model_name else '',
+        'generated_at': datetime.utcnow().isoformat() + 'Z',
+        'prompt_hash': hashlib.sha256(prompt.encode()).hexdigest(),
+        'watermark': None,
+    }
 
 
 class BugLocalizer(BaseAgent):
@@ -75,6 +88,8 @@ class BugLocalizer(BaseAgent):
             )
             result = parse_json_response(raw)
             result.setdefault('status', 'ok')
+            marking = _build_ai_marking(self.settings.llm_model, prompt)
+            result.update(marking)
             return result
         except Exception as exc:
             logger.error('BugLocalizer failed: %s', exc)

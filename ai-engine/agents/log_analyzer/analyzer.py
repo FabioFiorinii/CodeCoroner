@@ -1,5 +1,7 @@
+import hashlib
 import json
 import logging
+from datetime import datetime
 from agents.base_agent import BaseAgent
 from agents.json_utils import parse_json_response
 
@@ -14,7 +16,7 @@ Error Context:
 {error_context}
 
 Return ONLY valid JSON with this exact structure:
-{{
+{
   "error_type": "string - category of error (e.g. NullPointer, IndexError, SyntaxError, etc.)",
   "summary": "string - one-line summary of the error",
   "affected_files": ["list of file paths mentioned or implicated"],
@@ -22,9 +24,24 @@ Return ONLY valid JSON with this exact structure:
   "key_message": "string - the most important error message extracted",
   "language_detected": "string - programming language if identifiable",
   "suggested_focus": "string - what to investigate first"
-}}
+}
 
 Keep the response concise: summary and suggested_focus must each be at most 2 sentences."""
+
+
+def _compute_prompt_hash(prompt: str) -> str:
+    return hashlib.sha256(prompt.encode()).hexdigest()
+
+
+def _build_ai_marking(model_name: str, prompt: str) -> dict:
+    return {
+        'ai_generated': True,
+        'model_name': model_name,
+        'model_version': model_name.split(':')[-1] if ':' in model_name else '',
+        'generated_at': datetime.utcnow().isoformat() + 'Z',
+        'prompt_hash': hashlib.sha256(prompt.encode()).hexdigest(),
+        'watermark': None,
+    }
 
 
 class LogAnalyzer(BaseAgent):
@@ -39,6 +56,8 @@ class LogAnalyzer(BaseAgent):
             )
             result = parse_json_response(raw)
             result.setdefault('status', 'ok')
+            marking = _build_ai_marking(self.settings.llm_model, prompt)
+            result.update(marking)
             return result
         except Exception as exc:
             logger.error('LogAnalyzer failed: %s', exc)

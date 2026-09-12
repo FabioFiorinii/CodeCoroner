@@ -1,5 +1,7 @@
+import hashlib
 import json
 import logging
+from datetime import datetime
 from agents.base_agent import BaseAgent
 from agents.json_utils import parse_json_response
 
@@ -28,14 +30,25 @@ Instructions:
 4. cause_chain: explain in 3-5 short steps how the error propagates.
 
 Return ONLY valid JSON with this exact structure:
-{{
+{
   "summary": "string - root cause summary, at most 2 sentences",
   "root_file": "string - EXACT path from the candidate list",
   "root_line": number,
   "cause_chain": "string",
   "confidence": 0.0-1.0,
   "reasoning": "string - at most 5 sentences"
-}}"""
+}"""
+
+
+def _build_ai_marking(model_name: str, prompt: str) -> dict:
+    return {
+        'ai_generated': True,
+        'model_name': model_name,
+        'model_version': model_name.split(':')[-1] if ':' in model_name else '',
+        'generated_at': datetime.utcnow().isoformat() + 'Z',
+        'prompt_hash': hashlib.sha256(prompt.encode()).hexdigest(),
+        'watermark': None,
+    }
 
 
 class RootCauseAgent(BaseAgent):
@@ -70,6 +83,8 @@ class RootCauseAgent(BaseAgent):
             )
             result = parse_json_response(raw)
             result.setdefault('status', 'ok')
+            marking = _build_ai_marking(self.settings.rca_model, prompt)
+            result.update(marking)
             return result
         except Exception as exc:
             logger.error('RootCauseAgent failed: %s', exc)
