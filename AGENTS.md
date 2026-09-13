@@ -19,7 +19,7 @@ podman-compose up -d --build   # full stack
 make test                      # pytest inside django container
 make lint                      # ruff check + mypy inside django container
 podman-compose exec django pytest <path>::<test>   # single test
-make seed                      # base install (admin@codecoroner.dev / adminadmin) — also runs automatically on django container start
+make seed                      # base install (admin@codecoroner.dev / adminadmin) — run explicitly, no auto-seed at container start
 make seed-demo                 # demo/test data (bob, alice, Flask Demo project/repo/analysis)
 ```
 
