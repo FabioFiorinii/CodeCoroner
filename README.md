@@ -147,7 +147,7 @@ codecoroner/
 │
 ├── sandbox/                    # Isolated code execution container
 ├── infra/                      # Nginx, Postgres init, monitoring
-├── podman-compose.yml          # 10-service orchestration
+├── podman-compose.yml          # 11-service orchestration
 └── Makefile                    # Convenience commands
 ```
 
@@ -269,12 +269,12 @@ make lint     # Ruff check + mypy in container
 make shell    # Apre Django shell
 # Test frontend (il Node host è v16, troppo vecchio per vitest 2 → container node:22):
 # podman run --rm -v ./frontend:/app -v cc_frontend_modules:/app/node_modules -w /app node:22-alpine sh -c "npm ci --no-audit --no-fund && npm run test"
-make seed     # Popola il DB con dati base (admin@codecoroner.dev / adminadmin) — eseguito anche automaticamente al primo avvio
+make seed     # Popola il DB con dati base (admin@codecoroner.dev / adminadmin) — da eseguire esplicitamente, nessun seed automatico all'avvio
 make seed-demo # Popola il DB con dati demo/test (bob, alice, progetto Flask Demo)
 make superuser # Crea superuser
 make ps       # Stato dei container
 make restart  # down + up
-make clean    # Ferma tutto e pulisce i volumi (cancella TUTTE le immagini in cache!)
+make clean    # DISTRUTTIVO: cancella i volumi (DATABASE PERSO!) e TUTTE le immagini in cache — mai in produzione
 ```
 
 ## Troubleshooting
@@ -316,6 +316,14 @@ Container vecchi con lo stesso nome bloccano quelli nuovi. Rimuovili:
 podman-compose down
 podman rm <container_id>
 podman-compose up -d
+```
+
+### `podman ps` vuoto ma le porte rispondono
+
+Podman rootless e root (`sudo`) hanno storage separati: se lo stack è stato avviato con `sudo`, `podman ps` come utente normale risulta vuoto. Usa sempre lo stesso utente per tutti i comandi (e non mescolare `podman-compose` con `podman compose`, che vedono progetti diversi):
+
+```bash
+sudo podman ps -a --format '{{.Names}} {{.Status}}'
 ```
 
 ### Porte già in uso
@@ -414,7 +422,7 @@ WebSocket: `wss://localhost:8443/ws/analyses/{id}/` (real-time status; stage com
 - **Webhooks** — CRUD + test events, dispatched on analysis lifecycle; secrets stored **encrypted (Fernet)** and never serialized back
 - **Access control** — project memberships, groups, repo visibility for groups/superusers; **tenant isolation tests** (cross-tenant 404/403, owner-only membership mutations, foreign-repo assignment blocked)
 - **Auth options** — JWT (rotating refresh tokens, blacklist) + optional LDAP group mapping
-- **Login hardening** — brute-force lockout via django-axes (5 failed attempts → 24h cooldown, 403 on locked account)
+- **Login hardening** — brute-force lockout via django-axes (5 failed attempts → 1h cooldown, 403 on locked account)
 - **Backup & DR** — `make backup` (pg_dump + repo volume) / `make restore` with runbook
 - **Logging** — structured JSON logs with daily rotation in prod (`LOGGING`, TimedRotatingFileHandler)
 - **Data lifecycle** — periodic purge via Celery beat (git GC, orphan repo dirs, analysis retention 90d) + pgvector **HNSW** index on embeddings
