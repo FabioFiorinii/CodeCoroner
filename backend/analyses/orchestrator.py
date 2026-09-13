@@ -278,6 +278,21 @@ class AnalysisOrchestrator:
 
     def _broadcast_status(self):
         if self.channel_layer:
+            runs = []
+            for run in AnalysisRun.objects.filter(analysis=self.analysis).values(
+                'step', 'status', 'started_at', 'completed_at', 'error'
+            ):
+                started = run.get('started_at')
+                completed = run.get('completed_at')
+                runs.append(
+                    {
+                        'step': run.get('step'),
+                        'status': run.get('status'),
+                        'started_at': started.isoformat() if started else None,
+                        'completed_at': completed.isoformat() if completed else None,
+                        'error': run.get('error', ''),
+                    }
+                )
             async_to_sync(self.channel_layer.group_send)(
                 f'analysis_{self.analysis.id}',
                 {
@@ -285,11 +300,7 @@ class AnalysisOrchestrator:
                     'data': {
                         'id': str(self.analysis.id),
                         'status': self.analysis.status,
-                        'runs': list(
-                            AnalysisRun.objects.filter(analysis=self.analysis).values(
-                                'step', 'status', 'started_at', 'completed_at', 'error'
-                            )
-                        ),
+                        'runs': runs,
                     },
                 },
             )
@@ -304,7 +315,8 @@ class AnalysisOrchestrator:
             index_repository_task(str(repo.id))
 
     def _call_ai(self, endpoint: str, payload: dict, timeout: int = 600) -> dict:
-        resp = httpx.post(f'{AI_URL}/{endpoint}', json=payload, timeout=timeout)
+        safe_payload = json.loads(json.dumps(payload, default=str))
+        resp = httpx.post(f'{AI_URL}/{endpoint}', json=safe_payload, timeout=timeout)
         resp.raise_for_status()
         return resp.json()
 
@@ -398,7 +410,7 @@ class AnalysisOrchestrator:
             {
                 'repo_id': str(self.analysis.repository_id),
                 'error_context': ctx,
-                'log_analysis': self.log_analysis,
+                'log_analysis': self.log_analysis or {},
                 'chunks': chunks_for_ai,
                 'repo_profile': self.repo_profile,
                 'model': self.model_llm,
@@ -442,7 +454,7 @@ class AnalysisOrchestrator:
             {
                 'repo_id': str(self.analysis.repository_id),
                 'error_context': self.analysis.error_context,
-                'log_analysis': self.log_analysis,
+                'log_analysis': self.log_analysis or {},
                 'suspicious_files': suspicious,
                 'chunks': root_chunks,
                 'repo_profile': self.repo_profile,
@@ -506,7 +518,7 @@ class AnalysisOrchestrator:
         analysis_data = {
             'title': self.analysis.title,
             'error_context': self.analysis.error_context,
-            'log_analysis': self.log_analysis,
+            'log_analysis': self.log_analysis or {},
             'bug_localization': bug_loc,
             'root_cause': rca,
             'fix_suggestion': fix,
@@ -566,7 +578,7 @@ class AnalysisOrchestrator:
             'suggest-fix',
             {
                 'error_context': self.analysis.error_context,
-                'log_analysis': self.log_analysis,
+                'log_analysis': self.log_analysis or {},
                 'bug_localization': bug_loc,
                 'root_cause': rca,
                 'chunks': source_chunks,

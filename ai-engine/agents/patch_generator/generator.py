@@ -47,11 +47,11 @@ Relevant Source Code Chunks:
 {source_code}
 
 Your task: analyze the bug and propose a fix. Return ONLY valid JSON with this exact structure:
-{
+{{
   "diff": "string - a unified diff (--- a/... +++ b/...) of the proposed changes to fix the bug",
   "plan": "string - a concise, step-by-step plan for implementing the fix, written as a prompt for another AI. Minimize token usage: be direct, specific, and avoid any explanatory text. Only include: file path, line ranges to modify, what to change and what to replace it with.",
   "explanation": "string - detailed explanation of why this fix is needed: what causes the bug, what the change does, what side effects it might have, and why this approach was chosen over alternatives."
-}"""
+}}"""
 
 
 def _build_ai_marking(model_name: str, prompt: str) -> dict:
@@ -69,7 +69,7 @@ class PatchGenerator(BaseAgent):
     async def run(
         self,
         error_context: dict,
-        log_analysis: dict,
+        log_analysis: dict | None,
         bug_localization: dict | None,
         root_cause: dict | None,
         chunks: list,

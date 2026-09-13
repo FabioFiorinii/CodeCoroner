@@ -100,7 +100,7 @@ class AnalyzeLogsRequest(BaseModel):
 class LocalizeBugRequest(BaseModel):
     repo_id: str
     error_context: dict
-    log_analysis: dict
+    log_analysis: dict | None = None
     chunks: list
     repo_profile: str = ''
     model: str | None = None
@@ -109,7 +109,7 @@ class LocalizeBugRequest(BaseModel):
 class RootCauseRequest(BaseModel):
     repo_id: str
     error_context: dict
-    log_analysis: dict
+    log_analysis: dict | None = None
     suspicious_files: list
     chunks: list
     repo_profile: str = ''
@@ -124,7 +124,7 @@ class ReportRequest(BaseModel):
 
 class SuggestFixRequest(BaseModel):
     error_context: dict
-    log_analysis: dict
+    log_analysis: dict | None = None
     bug_localization: dict | None = None
     root_cause: dict | None = None
     chunks: list = []
@@ -256,7 +256,7 @@ async def localize_bug(req: LocalizeBugRequest):
         result = await bug_localizer.run(
             repo_id=req.repo_id,
             error_context=req.error_context,
-            log_analysis=req.log_analysis,
+            log_analysis=req.log_analysis or {},
             chunks=req.chunks,
             repo_profile=req.repo_profile,
         )
@@ -281,7 +281,7 @@ async def analyze_root_cause(req: RootCauseRequest):
         result = await rca_agent.run(
             repo_id=req.repo_id,
             error_context=req.error_context,
-            log_analysis=req.log_analysis,
+            log_analysis=req.log_analysis or {},
             suspicious_files=req.suspicious_files,
             chunks=req.chunks,
             repo_profile=req.repo_profile,
@@ -311,7 +311,7 @@ async def suggest_fix(req: SuggestFixRequest):
         patch_gen.settings.rca_model = model
         result = await patch_gen.run(
             error_context=req.error_context,
-            log_analysis=req.log_analysis,
+            log_analysis=req.log_analysis or {},
             bug_localization=req.bug_localization,
             root_cause=req.root_cause,
             chunks=req.chunks,

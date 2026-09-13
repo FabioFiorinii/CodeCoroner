@@ -41,10 +41,10 @@ Rules:
 - Be direct; skip filler.
 
 Return ONLY valid JSON with this structure:
-{
+{{
   "title": "string - short report title",
   "markdown": "string - the full Markdown report"
-}"""
+}}"""
 
 
 def _build_ai_marking(model_name: str, prompt: str) -> dict:

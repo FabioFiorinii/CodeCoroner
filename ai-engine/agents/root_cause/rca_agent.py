@@ -30,14 +30,14 @@ Instructions:
 4. cause_chain: explain in 3-5 short steps how the error propagates.
 
 Return ONLY valid JSON with this exact structure:
-{
+{{
   "summary": "string - root cause summary, at most 2 sentences",
   "root_file": "string - EXACT path from the candidate list",
   "root_line": number,
   "cause_chain": "string",
   "confidence": 0.0-1.0,
   "reasoning": "string - at most 5 sentences"
-}"""
+}}"""
 
 
 def _build_ai_marking(model_name: str, prompt: str) -> dict:
@@ -56,7 +56,7 @@ class RootCauseAgent(BaseAgent):
         self,
         repo_id: str,
         error_context: dict,
-        log_analysis: dict,
+        log_analysis: dict | None,
         suspicious_files: list,
         chunks: list,
         repo_profile: str = '',

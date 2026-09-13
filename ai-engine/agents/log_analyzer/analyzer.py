@@ -16,7 +16,7 @@ Error Context:
 {error_context}
 
 Return ONLY valid JSON with this exact structure:
-{
+{{
   "error_type": "string - category of error (e.g. NullPointer, IndexError, SyntaxError, etc.)",
   "summary": "string - one-line summary of the error",
   "affected_files": ["list of file paths mentioned or implicated"],
@@ -24,7 +24,7 @@ Return ONLY valid JSON with this exact structure:
   "key_message": "string - the most important error message extracted",
   "language_detected": "string - programming language if identifiable",
   "suggested_focus": "string - what to investigate first"
-}
+}}
 
 Keep the response concise: summary and suggested_focus must each be at most 2 sentences."""
 

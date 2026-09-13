@@ -33,17 +33,17 @@ Instructions:
 4. "file_path" MUST be an exact string from the candidate list above. NEVER invent a path.
 
 Return ONLY valid JSON with this exact structure:
-{
+{{
   "summary": "string - brief summary, at most 2 sentences",
   "suspicious_files": [
-    {
+    {{
       "file_path": "string - EXACT path from the candidate list",
       "score": 0.0-1.0,
       "evidence": "string - why this file is suspicious",
       "rank": 1
-    }
+    }}
   ]
-}"""
+}}"""
 
 
 def _build_ai_marking(model_name: str, prompt: str) -> dict:
@@ -62,7 +62,7 @@ class BugLocalizer(BaseAgent):
         self,
         repo_id: str,
         error_context: dict,
-        log_analysis: dict,
+        log_analysis: dict | None,
         chunks: list,
         repo_profile: str = '',
     ) -> dict:
