@@ -15,13 +15,18 @@ services:
   postgres:
     image: docker.io/pgvector/pgvector:pg16
     container_name: cc-postgres
+    logging:
+      driver: k8s-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     volumes:
       - pg_data:/var/lib/postgresql/data:Z
       - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro,Z
     environment:
-      POSTGRES_DB: codecoroner
-      POSTGRES_USER: codecoroner
-      POSTGRES_PASSWORD: dev_password
+      POSTGRES_DB: ${DB_NAME:-codecoroner}
+      POSTGRES_USER: ${DB_USER:-codecoroner}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-dev_password}
     networks:
       - codecoroner_net
     healthcheck:
@@ -36,6 +41,11 @@ services:
   redis:
     image: docker.io/redis:7-alpine
     container_name: cc-redis
+    logging:
+      driver: k8s-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     volumes:
       - redis_data:/data:Z
     networks:
