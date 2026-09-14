@@ -1,0 +1,64 @@
+# Production override — immutable images, hardened Django settings.
+#
+# Usage (from the repo root):
+#   cp .env.prod.example .env.prod   # then fill in real secrets (never commit .env.prod)
+#   podman-compose -f podman-compose.yml -f podman-compose.prod.yml up -d --build
+#
+# What this override changes vs the base file:
+# - Django services run with config.settings.prod (fail-fast on default secrets,
+#   throttling, secure cookies, HSTS) instead of dev + runserver.
+# - django uses gunicorn (same command as the Dockerfile CMD).
+# - Source bind-mounts (./backend, ./ai-engine, ./frontend) are replaced with
+#   data-only volumes, so production runs the baked images, not the working tree.
+#   NOTE: this relies on compose merging `volumes` by container target path
+#   (override wins). Verify with:
+#     podman-compose -f podman-compose.yml -f podman-compose.prod.yml config | grep -E '\./(backend|ai-engine|frontend):'
+#   which must print nothing. Every code change in prod requires a rebuild:
+#     podman-compose -f podman-compose.yml -f podman-compose.prod.yml up -d --build <service>
+
+services:
+  django:
+    command: python -m gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 120
+    env_file:
+      - .env.prod
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+      DJANGO_DEBUG: 'False'
+    volumes:
+      - static_volume:/app/static:Z
+      - repo_cache:/app/media/repos:Z
+
+  daphne:
+    env_file:
+      - .env.prod
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+      DJANGO_DEBUG: 'False'
+    volumes:
+      - repo_cache:/app/media/repos:Z
+
+  celery_worker:
+    env_file:
+      - .env.prod
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+      DJANGO_DEBUG: 'False'
+    volumes:
+      - repo_cache:/app/media/repos:Z
+
+  celery_beat:
+    env_file:
+      - .env.prod
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+      DJANGO_DEBUG: 'False'
+
+  ai-engine:
+    env_file:
+      - .env.prod
+    volumes:
+      - repo_cache:/app/repos:ro,Z
+
+  nginx:
+    environment:
+      ENABLE_HSTS: 'true'
