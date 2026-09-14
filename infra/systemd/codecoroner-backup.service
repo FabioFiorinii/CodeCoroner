@@ -1,0 +1,16 @@
+# CodeCoroner daily backup — systemd option (native Linux only, not WSL2).
+# For WSL2 or minimal setups use cron instead (see scripts/backup-restore.md).
+# Adjust WorkingDirectory to the repo path, then:
+#   sudo cp infra/systemd/codecoroner-backup.* /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now codecoroner-backup.timer
+[Unit]
+Description=CodeCoroner daily backup
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/codecoroner
+ExecStart=/usr/bin/bash /opt/codecoroner/scripts/backup.sh
+# Run as the user that owns the podman storage (rootful setup shown here).
+User=root

@@ -1,0 +1,10 @@
+# Runs the CodeCoroner backup every night at 03:30 local time.
+[Unit]
+Description=CodeCoroner daily backup timer
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

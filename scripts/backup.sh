@@ -35,3 +35,11 @@ find "$BACKUP_DIR" -type f \( -name 'codecoroner-*.dump' -o -name 'repos-*.tar.g
 
 echo "==> Backup complete:"
 ls -lh "$BACKUP_DIR"
+
+# Optional off-host copy (set BACKUP_RSYNC_TARGET=user@host:/path/ or /mnt/usb/...).
+# Empty = local only. No --delete: remote pruning is the owner's choice.
+if [ -n "${BACKUP_RSYNC_TARGET:-}" ]; then
+    echo "==> Syncing backups to ${BACKUP_RSYNC_TARGET}..."
+    rsync -av "$BACKUP_DIR/" "$BACKUP_RSYNC_TARGET/"
+    echo "==> Off-host sync complete."
+fi

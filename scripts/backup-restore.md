@@ -20,9 +20,26 @@ Outputs into `./backups/`:
 - `codecoroner-<timestamp>.dump` — compressed DB dump
 - `repos-<timestamp>.tar.gz` — repo cache volume
 
-Config (env): `BACKUP_DIR` (default `./backups`), `RETENTION_DAYS` (default 7).
+Config (env): `BACKUP_DIR` (default `./backups`), `RETENTION_DAYS` (default 7),
+`BACKUP_RSYNC_TARGET` (optional off-host copy target, e.g. `user@nas:/backups/codecoroner/`).
 
 **For real DR, copy `./backups/` off this machine** (external disk / another host / rsync target). A backup that lives on the same disk as the data protects you from nothing.
+
+## Scheduled backups
+
+`backup.sh` is cron-safe (it `cd`s to the repo root and reads `.env`). Primary method — cron (works on WSL2 and Linux):
+
+```cron
+# nightly backup at 03:30; set BACKUP_RSYNC_TARGET in .env for the off-host copy
+30 3 * * * bash /path/to/codecoroner/scripts/backup.sh >> /var/log/codecoroner-backup.log 2>&1
+```
+
+Alternative on native Linux with systemd: units in `infra/systemd/` (adjust `WorkingDirectory` first):
+
+```bash
+sudo cp infra/systemd/codecoroner-backup.* /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now codecoroner-backup.timer
+```
 
 ## Restore
 
@@ -43,7 +60,9 @@ make migrate
 make seed   # only if the base admin user is missing
 ```
 
-## Testing the restore (do this periodically)
+## Testing the restore (quarterly drill — do not skip)
+
+Cadence: at least once per quarter, plus after every change to backup/restore scripts or Postgres major upgrades. Record each drill in the evidence log below.
 
 1. `make backup`
 2. Reset the database: `podman-compose down && podman volume rm pg_data`
@@ -51,6 +70,12 @@ make seed   # only if the base admin user is missing
 4. `make restore DUMP=backups/codecoroner-<latest>.dump`
 5. Verify: log in, open a project/analysis, confirm embeddings still answer (vector search works).
 6. If step 5 fails, fix the runbook — a backup that cannot be restored is not a backup.
+
+### Drill evidence log
+
+| Date | Host | Result | Notes |
+|---|---|---|---|
+| 2026-08-19 | fresh WSL2 (Ubuntu 24.04) | OK | full-stack restore, see below |
 
 ## Test evidence (2026-08-19, fresh machine)
 
