@@ -10,7 +10,8 @@ CodeCoroner: AI debugging/RCA platform. Monorepo with 4 codebases:
 
 - The stack only runs via **Podman Compose, which requires WSL2 on Windows**. Native Windows won't work. All backend/frontend processes run in containers.
 - Dockerfiles use bind mounts (`./backend:/app`, `./ai-engine:/app`, `./frontend:/app`), so Python/TS edits hot-reload. The django container starts `runserver` directly; migrations are applied explicitly with `make migrate` and are committed.
-- `make` targets are the canonical commands (`make up/down/build/logs/migrate/test/lint/shell/seed/superuser/ps`). `make clean` prunes ALL cached images including the ~3GB Ollama image — avoid unless intended.
+- `make` targets are the canonical commands (`make up/up-prod/install/install-prod/down/build/logs/migrate/test/lint/shell/seed/superuser/ps/backup/restore/health`). `make clean` runs `down -v` (DATABASE LOST) + prune ALL cached images including the ~3GB Ollama image — avoid unless intended.
+- Prod runs via `podman-compose.prod.yml` override + `.env.prod` (never commit; `.env.prod.example` is the template). Prod drops source bind-mounts, so every code change needs `--build`. New TLS knobs: `HTTP_PORT`/`HTTPS_PORT`/`CERT_MODE` (`selfsigned`|`byo`|`behind-proxy`) wired through `infra/nginx/entrypoint.sh`; new scripts `install.sh`/`healthcheck.sh` are cron-safe and idempotent; `backup.sh` gained `BACKUP_RSYNC_TARGET`.
 
 ## Commands
 
@@ -32,7 +33,7 @@ make seed-demo                 # demo/test data (bob, alice, Flask Demo project/
 - Indexing flow: `repositories/tasks.py` — clone/pull → tree-sitter chunking (`chunking.py`, `IGNORED_DIRS`/`IGNORED_EXTENSIONS` sets) → batch embed via ai-engine `/embed` (nomic-embed-text, 768-dim) → store in pgvector `ChunkEmbedding`.
 - Repos are cloned into `backend/media/repos/` (gitignored; `repo_cache` volume shared read-only with ai-engine). `backend/media/` and `backend/static/` are gitignored build/runtime dirs.
 - Settings split under `backend/config/settings/`: `dev` (used by compose, debug toolbar, no throttling), `prod` (Dockerfile default), `test` (used by pytest, `CELERY_TASK_ALWAYS_EAGER=True`, locmem cache). mypy is wired to `config.settings.dev` via pyproject.
-- nginx terminates TLS on **:8443** (HTTP :8080 → 301 redirect). Self-signed cert is generated on first start by `infra/nginx/entrypoint.sh` into the `nginx_certs` volume (openssl installed on the fly, not baked into the image). HSTS is off by default — enable with `ENABLE_HSTS=true`. Security headers + CSP live in `infra/nginx/nginx.conf`.
+- nginx terminates TLS on **:${HTTPS_PORT:-8443}** (HTTP :${HTTP_PORT:-8080} → 301 redirect; ports + `CERT_MODE` come from env). Self-signed cert is generated on first start by `infra/nginx/entrypoint.sh` into the `nginx_certs` volume (openssl installed on the fly, not baked into the image); `CERT_MODE=byo` fails fast without mounted certs, `behind-proxy` serves plain HTTP via `nginx-behind-proxy.conf`. HSTS is off by default — enable with `ENABLE_HSTS=true`. Security headers + CSP live in `infra/nginx/nginx.conf`.
 - **`specs/*.md` are design docs that have drifted from the code** (e.g., they describe `analyses/tasks/` dirs and a gRPC agent server; actual code is `analyses/tasks.py` and plain HTTP). Use them for intent, but trust the code.
 
 ## Testing

@@ -254,12 +254,24 @@ podman-compose exec ollama ollama pull nomic-embed-text
 - **MinIO Console**: http://localhost:9001
 - **Ollama API**: http://localhost:11434/api/tags
 
-> **HTTPS**: il certificato self-signed viene generato automaticamente al primo avvio di nginx e persiste nel volume `nginx_certs`. Per usare HSTS (strict-transport-security) in produzione impostare `ENABLE_HSTS=true` nel `.env`; per certificati reali montare cert/key in `infra/nginx/certs/server.crt|server.key` e, se si espone la 443, aggiornare la porta nel redirect di `infra/nginx/nginx.conf`.
+> **HTTPS**: porta e modalità TLS si configurano da env (`HTTP_PORT`, `HTTPS_PORT`, `CERT_MODE`) — nessun edit di `nginx.conf` richiesto. Tre scenari:
+>
+> | `CERT_MODE` | Quando | Come |
+> |---|---|---|
+> | `selfsigned` (default) | dev/test | cert auto-generato al primo avvio nel volume `nginx_certs` |
+> | `byo` | produzione on-prem | copiare `server.crt`+`server.key` nel volume `nginx_certs` prima dell'avvio (senza cert, nginx rifiuta di partire) |
+> | `behind-proxy` | TLS sul proxy del cliente | il nostro nginx serve solo HTTP sulla `HTTP_PORT`; HSTS e redirect vanno configurati sul proxy esterno |
+>
+> HSTS interno: `ENABLE_HSTS=true` (forzato a `true` nell'override prod). Per esporre la 443 standard basta `HTTPS_PORT=443`.
 
 ### Comandi utili (Makefile)
 
 ```bash
 make up       # Avvia tutti i servizi
+make up-prod  # Avvia con l'override produzione (richiede .env.prod)
+make install  # Installazione guidata dev (prerequisiti, secret, migrate, seed)
+make install-prod # Installazione guidata prod
+make health   # Watchdog: API, ai-engine, nginx, celery, DLQ, disco
 make down     # Ferma tutti i servizi
 make build    # Ricostruisce le immagini (fatelo dopo modifiche ai Dockerfile/requirements!)
 make logs     # Vedi i log in tempo reale
