@@ -1,7 +1,16 @@
-.PHONY: up down build logs migrate test lint shell seed seed-demo superuser clean restart ps backup restore
+.PHONY: up up-prod install install-prod down build logs migrate test lint shell seed seed-demo superuser clean restart ps backup restore health
 
 up:
 	podman-compose up -d
+
+up-prod:
+	podman-compose -f podman-compose.yml -f podman-compose.prod.yml up -d --build
+
+install:
+	bash scripts/install.sh
+
+install-prod:
+	bash scripts/install.sh --prod
 
 down:
 	podman-compose down
@@ -11,6 +20,9 @@ backup:
 
 restore:
 	bash scripts/restore.sh $(DUMP)
+
+health:
+	bash scripts/healthcheck.sh
 
 build:
 	podman-compose build
